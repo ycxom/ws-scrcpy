@@ -168,17 +168,42 @@ export class ScreenWall extends ScreenWallBase {
             console.log('[ScreenWall] Click event triggered');
             const card = (e.target as HTMLElement).closest('.screen-wall-card');
             if (card) {
-                const udid = decodeURIComponent(card.getAttribute('data-udid') || '');
-                const ws = decodeURIComponent(card.getAttribute('data-ws') || '');
-                console.log('[ScreenWall] Navigating to control:', { udid, ws });
-                this.navigateToControl(udid, ws);
+                const linkId = card.getAttribute('data-link-id');
+                console.log('[ScreenWall] Navigating to control, linkId:', linkId);
+                this.navigateToControl(linkId || '');
             }
         });
     }
     
-    private navigateToControl(udid: string, ws: string): void {
-        const wsUrl = ws || 'ws://localhost:8886';
-        const hash = `#!action=stream&udid=${encodeURIComponent(udid)}&ws=${encodeURIComponent(wsUrl)}&player=webcodecs`;
+    private navigateToControl(linkId: string): void {
+        // 从 this.links 中找到对应的 link
+        const link = this.links.find(l => l.id === linkId);
+        if (!link) {
+            console.error('[ScreenWall] Link not found:', linkId);
+            return;
+        }
+        
+        const udid = link.udid || link.id;
+        let finalWsUrl = link.url || '';
+        
+        // 如果有设备 URL，构建代理 URL
+        if (finalWsUrl) {
+            const proxyUrl = new URL(window.location.href);
+            proxyUrl.pathname = '/';
+            proxyUrl.search = '';
+            proxyUrl.hash = '';
+            proxyUrl.searchParams.set('action', 'proxy-ws');
+            proxyUrl.searchParams.set('ws', finalWsUrl);
+            
+            // 将 http/https 转换为 ws/wss
+            proxyUrl.protocol = proxyUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+            finalWsUrl = proxyUrl.toString();
+        } else {
+            // 没有 URL 时使用 localhost:8886
+            finalWsUrl = 'ws://localhost:8886';
+        }
+        
+        const hash = `#!action=stream&udid=${encodeURIComponent(udid)}&ws=${encodeURIComponent(finalWsUrl)}&player=webcodecs`;
         console.log('[ScreenWall] Setting hash:', hash);
         window.location.hash = hash;
         window.location.reload();
@@ -196,13 +221,30 @@ export class ScreenWall extends ScreenWallBase {
             sendFrameMeta: 'false',
         });
         
-        if (link.udid && link.url) {
-            url.hash = `#!action=stream&udid=${encodeURIComponent(link.udid)}&ws=${encodeURIComponent(link.url)}&player=webcodecs&hiddenUI=true&${screenWallParams.toString()}`;
+        // 构建代理 URL - 所有设备都通过 node 代理连接
+        let proxyWsUrl = '';
+        if (link.url) {
+            // 如果有设备 URL，使用 proxy-ws action 代理
+            const proxyUrl = new URL(window.location.href);
+            proxyUrl.pathname = '/';
+            proxyUrl.search = '';
+            proxyUrl.hash = '';
+            proxyUrl.searchParams.set('action', 'proxy-ws');
+            proxyUrl.searchParams.set('ws', link.url);
+            
+            // 将 http/https 转换为 ws/wss
+            proxyUrl.protocol = proxyUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+            proxyWsUrl = proxyUrl.toString();
+        }
+        
+        const udid = link.udid || link.id;
+        
+        if (proxyWsUrl) {
+            url.hash = `#!action=stream&udid=${encodeURIComponent(udid)}&ws=${encodeURIComponent(proxyWsUrl)}&player=webcodecs&hiddenUI=true&${screenWallParams.toString()}`;
         } else if (link.udid) {
+            // 对于没有 URL 的本地设备，直接连接到 localhost:8886
             const wsUrl = `ws://localhost:8886`;
-            url.hash = `#!action=stream&udid=${encodeURIComponent(link.udid)}&ws=${encodeURIComponent(wsUrl)}&player=webcodecs&hiddenUI=true&${screenWallParams.toString()}`;
-        } else if (link.url) {
-            url.hash = `#!action=stream&udid=${encodeURIComponent(link.id)}&ws=${encodeURIComponent(link.url)}&player=webcodecs&hiddenUI=true&${screenWallParams.toString()}`;
+            url.hash = `#!action=stream&udid=${encodeURIComponent(udid)}&ws=${encodeURIComponent(wsUrl)}&player=webcodecs&hiddenUI=true&${screenWallParams.toString()}`;
         }
         
         return url.toString();
