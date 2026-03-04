@@ -3,7 +3,7 @@ import * as readline from 'readline';
 import { Config } from './Config';
 import { HttpServer } from './services/HttpServer';
 import { WebSocketServer } from './services/WebSocketServer';
-import { UdpServer } from './services/UdpServer';
+import { HlsStreamService } from './services/HlsStreamService';
 import { Service, ServiceClass } from './services/Service';
 import { MwFactory } from './mw/Mw';
 import { WebsocketProxy } from './mw/WebsocketProxy';
@@ -11,7 +11,7 @@ import { HostTracker } from './mw/HostTracker';
 import { WebsocketMultiplexer } from './mw/WebsocketMultiplexer';
 import { ScreenWallMw } from './mw/ScreenWallMw';
 
-const servicesToStart: ServiceClass[] = [HttpServer, WebSocketServer, UdpServer];
+const servicesToStart: ServiceClass[] = [HttpServer, WebSocketServer, HlsStreamService];
 
 // MWs that accept WebSocket
 const mwList: MwFactory[] = [WebsocketProxy, WebsocketMultiplexer, ScreenWallMw];

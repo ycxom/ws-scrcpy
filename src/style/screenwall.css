@@ -139,7 +139,8 @@ body.screen-wall {
 }
 
 .card-canvas,
-.card-iframe {
+.card-iframe,
+.card-video {
     display: block;
 }
 
@@ -162,6 +163,13 @@ body.screen-wall {
     position: absolute;
     top: 0;
     left: 0;
+}
+
+.card-video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
 }
 
 .card-click-overlay {

@@ -139,13 +139,12 @@ export class ScreenWall extends ScreenWallBase {
     private getCardTemplate(link: ScreenWallLink): string {
         const bitrateKbps = Math.round((link.bitrate || 200000) / 1000);
         const fps = link.maxFps || 10;
-        
-        const iframeUrl = this.buildStreamUrl(link);
+        const streamUrl = this.buildStreamUrl(link);
         
         return `
             <div class="screen-wall-card" data-link-id="${link.id}" data-udid="${encodeURIComponent(link.udid || link.id)}" data-ws="${encodeURIComponent(link.url || '')}">
                 <div class="screen-wall-card-preview">
-                    <iframe id="card-iframe-${link.id}" class="card-iframe" src="${iframeUrl}" frameborder="0"></iframe>
+                    <iframe src="${streamUrl}" class="card-iframe" frameborder="0" scrolling="no"></iframe>
                     <div class="card-click-overlay" title="点击进入控制模式"></div>
                     <span class="no-signal hidden" id="no-signal-${link.id}">无信号</span>
                     <div class="screen-wall-card-info">
@@ -175,40 +174,6 @@ export class ScreenWall extends ScreenWallBase {
         });
     }
     
-    private navigateToControl(linkId: string): void {
-        // 从 this.links 中找到对应的 link
-        const link = this.links.find(l => l.id === linkId);
-        if (!link) {
-            console.error('[ScreenWall] Link not found:', linkId);
-            return;
-        }
-        
-        const udid = link.udid || link.id;
-        let finalWsUrl = link.url || '';
-        
-        // 如果有设备 URL，构建代理 URL
-        if (finalWsUrl) {
-            const proxyUrl = new URL(window.location.href);
-            proxyUrl.pathname = '/';
-            proxyUrl.search = '';
-            proxyUrl.hash = '';
-            proxyUrl.searchParams.set('action', 'proxy-ws');
-            proxyUrl.searchParams.set('ws', finalWsUrl);
-            
-            // 将 http/https 转换为 ws/wss
-            proxyUrl.protocol = proxyUrl.protocol === 'https:' ? 'wss:' : 'ws:';
-            finalWsUrl = proxyUrl.toString();
-        } else {
-            // 没有 URL 时使用 localhost:8886
-            finalWsUrl = 'ws://localhost:8886';
-        }
-        
-        const hash = `#!action=stream&udid=${encodeURIComponent(udid)}&ws=${encodeURIComponent(finalWsUrl)}&player=webcodecs`;
-        console.log('[ScreenWall] Setting hash:', hash);
-        window.location.hash = hash;
-        window.location.reload();
-    }
-
     private buildStreamUrl(link: ScreenWallLink): string {
         const url = new URL(window.location.href);
         // 屏幕墙使用独立的视频设置，避免与控制模式冲突
@@ -248,6 +213,40 @@ export class ScreenWall extends ScreenWallBase {
         }
         
         return url.toString();
+    }
+
+    private navigateToControl(linkId: string): void {
+        // 从 this.links 中找到对应的 link
+        const link = this.links.find(l => l.id === linkId);
+        if (!link) {
+            console.error('[ScreenWall] Link not found:', linkId);
+            return;
+        }
+        
+        const udid = link.udid || link.id;
+        let finalWsUrl = link.url || '';
+        
+        // 如果有设备 URL，构建代理 URL
+        if (finalWsUrl) {
+            const proxyUrl = new URL(window.location.href);
+            proxyUrl.pathname = '/';
+            proxyUrl.search = '';
+            proxyUrl.hash = '';
+            proxyUrl.searchParams.set('action', 'proxy-ws');
+            proxyUrl.searchParams.set('ws', finalWsUrl);
+            
+            // 将 http/https 转换为 ws/wss
+            proxyUrl.protocol = proxyUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+            finalWsUrl = proxyUrl.toString();
+        } else {
+            // 没有 URL 时使用 localhost:8886
+            finalWsUrl = 'ws://localhost:8886';
+        }
+        
+        const hash = `#!action=stream&udid=${encodeURIComponent(udid)}&ws=${encodeURIComponent(finalWsUrl)}&player=webcodecs`;
+        console.log('[ScreenWall] Setting hash:', hash);
+        window.location.hash = hash;
+        window.location.reload();
     }
 
     private adjustGridLayout(grid: HTMLElement, deviceCount: number): void {
