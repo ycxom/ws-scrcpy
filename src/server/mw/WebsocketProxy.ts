@@ -2,6 +2,8 @@ import { Mw, RequestParameters } from './Mw';
 import WS from 'ws';
 import { ACTION } from '../../common/Action';
 import { Multiplexer } from '../../packages/multiplexer/Multiplexer';
+import { UdpServer } from '../services/UdpServer';
+import { ScreenWallService } from './ScreenWallMw';
 
 export class WebsocketProxy extends Mw {
     public static readonly TAG = 'WebsocketProxy';
@@ -47,9 +49,15 @@ export class WebsocketProxy extends Mw {
         remoteSocket.onmessage = (event) => {
             if (this.ws && this.ws.readyState === this.ws.OPEN) {
                 if (Array.isArray(event.data)) {
-                    event.data.forEach((data) => this.ws.send(data));
+                    event.data.forEach((data) => {
+                        this.ws.send(data);
+                        // 广播视频数据到 UDP
+                        this.broadcastToUdp(data);
+                    });
                 } else {
                     this.ws.send(event.data);
+                    // 广播视频数据到 UDP
+                    this.broadcastToUdp(event.data);
                 }
             }
         };
@@ -85,6 +93,26 @@ export class WebsocketProxy extends Mw {
             this.remoteSocket.send(event.data);
         } else {
             this.storage.push(event);
+        }
+    }
+
+    private broadcastToUdp(data: any): void {
+        // 检查是否有屏幕墙客户端连接
+        if (ScreenWallService.getInstance().getClientCount() > 0) {
+            const udpServer = UdpServer.getInstance();
+            // 确保数据是 Buffer 或 Uint8Array
+            let buffer: Buffer;
+            if (data instanceof Buffer) {
+                buffer = data;
+            } else if (data instanceof ArrayBuffer) {
+                buffer = Buffer.from(data);
+            } else if (data instanceof Uint8Array) {
+                buffer = Buffer.from(data);
+            } else {
+                return; // 不是视频数据，跳过
+            }
+            // 广播数据到所有 UDP 客户端
+            udpServer.broadcast(buffer);
         }
     }
 

@@ -94,7 +94,7 @@ export abstract class BasePlayer extends TypedEmitter<PlayerEvents> {
         bitrate: 524288,
         maxFps: 24,
         iFrameInterval: 5,
-        bounds: new Size(480, 480),
+        bounds: new Size(1920, 1920),
         sendFrameMeta: false,
     });
 
@@ -385,10 +385,6 @@ export abstract class BasePlayer extends TypedEmitter<PlayerEvents> {
         const { width, height } = screenInfo.videoSize;
         this.touchableCanvas.width = width;
         this.touchableCanvas.height = height;
-        if (this.parentElement) {
-            this.parentElement.style.height = `${height}px`;
-            this.parentElement.style.width = `${width}px`;
-        }
         const size = new Size(width, height);
         this.emit('video-view-resize', size);
     }

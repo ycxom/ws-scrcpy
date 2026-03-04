@@ -22,13 +22,13 @@ export class CommandControlMessage extends ControlMessage {
     public static PAYLOAD_LENGTH = 0;
 
     public static Commands: Map<number, string> = new Map([
-        [ControlMessage.TYPE_EXPAND_NOTIFICATION_PANEL, 'Expand notifications'],
-        [ControlMessage.TYPE_EXPAND_SETTINGS_PANEL, 'Expand settings'],
-        [ControlMessage.TYPE_COLLAPSE_PANELS, 'Collapse panels'],
-        [ControlMessage.TYPE_GET_CLIPBOARD, 'Get clipboard'],
-        [ControlMessage.TYPE_SET_CLIPBOARD, 'Set clipboard'],
-        [ControlMessage.TYPE_ROTATE_DEVICE, 'Rotate device'],
-        [ControlMessage.TYPE_CHANGE_STREAM_PARAMETERS, 'Change video settings'],
+        [ControlMessage.TYPE_EXPAND_NOTIFICATION_PANEL, '展开通知'],
+        [ControlMessage.TYPE_EXPAND_SETTINGS_PANEL, '展开设置'],
+        [ControlMessage.TYPE_COLLAPSE_PANELS, '收起面板'],
+        [ControlMessage.TYPE_GET_CLIPBOARD, '获取剪贴板'],
+        [ControlMessage.TYPE_SET_CLIPBOARD, '设置剪贴板'],
+        [ControlMessage.TYPE_ROTATE_DEVICE, '旋转设备'],
+        [ControlMessage.TYPE_CHANGE_STREAM_PARAMETERS, '修改视频设置'],
     ]);
 
     public static createSetVideoSettingsCommand(videoSettings: VideoSettings): CommandControlMessage {

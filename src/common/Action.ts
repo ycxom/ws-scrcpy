@@ -12,4 +12,6 @@ export enum ACTION {
     STREAM_MJPEG = 'stream-mjpeg',
     PROXY_WDA = 'proxy-wda',
     FILE_LISTING = 'list-files',
+    SCREEN_WALL = 'screen-wall',
+    SCREEN_WALL_DEVICE = 'screen-wall-device',
 }

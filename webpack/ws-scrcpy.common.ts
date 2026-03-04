@@ -110,6 +110,7 @@ const front: webpack.Configuration = {
     resolve: {
         fallback: {
             path: 'path-browserify',
+            events: require.resolve('events/'),
         },
         extensions: ['.tsx', '.ts', '.js'],
     },

@@ -1,0 +1,237 @@
+import { TypedEmitter } from '../../common/TypedEmitter';
+import { ParamsBase } from '../../types/ParamsBase';
+import { ACTION } from '../../common/Action';
+import { ScreenWallLink, ScreenWallMessage } from '../../types/ScreenWall';
+import SvgImage from '../ui/SvgImage';
+
+type ScreenWallParams = ParamsBase;
+
+class ScreenWallBase extends TypedEmitter<Record<string, never>> {
+    protected title = '屏幕墙';
+    protected params: ScreenWallParams;
+
+    protected constructor(params: ScreenWallParams) {
+        super();
+        this.params = params;
+    }
+
+    public setTitle(text = this.title): void {
+        let titleTag: HTMLTitleElement | null = document.querySelector('head > title');
+        if (!titleTag) {
+            titleTag = document.createElement('title');
+        }
+        titleTag.innerText = text;
+    }
+
+    public setBodyClass(text: string): void {
+        document.body.className = text;
+    }
+}
+
+export class ScreenWall extends ScreenWallBase {
+    public static readonly ACTION = ACTION.SCREEN_WALL;
+    private links: ScreenWallLink[] = [];
+    private ws: WebSocket | null = null;
+
+    constructor() {
+        super({ action: ScreenWall.ACTION });
+        this.setBodyClass('screen-wall');
+        this.initUI();
+        this.connect();
+        this.connectUdp();
+    }
+
+    private buildUrl(params: Record<string, string>): string {
+        const url = new URL(window.location.href);
+        Object.entries(params).forEach(([key, value]) => {
+            url.searchParams.set(key, value);
+        });
+        return url.toString();
+    }
+
+    protected initUI(): void {
+        document.body.innerHTML = '';
+        const container = document.createElement('div');
+        container.id = 'screen-wall-container';
+        container.innerHTML = this.getTemplate();
+        document.body.appendChild(container);
+        this.bindEvents();
+    }
+
+    private getTemplate(): string {
+        return `
+            <div id="screen-wall-header">
+                <h1>屏幕墙</h1>
+            </div>
+            <div id="screen-wall-grid" class="screen-wall-grid">
+                ${this.getEmptyTemplate()}
+            </div>
+        `;
+    }
+
+    private getEmptyTemplate(): string {
+        const displayIcon = SvgImage.create(SvgImage.Icon.MENU);
+        return `
+            <div class="screen-wall-empty">
+                <div class="screen-wall-empty-icon">${displayIcon.outerHTML}</div>
+                <div class="screen-wall-empty-text">屏幕墙为空</div>
+                <div class="screen-wall-empty-hint">点击"添加链接"添加屏幕</div>
+            </div>
+        `;
+    }
+
+    private connect(): void {
+        const url = this.buildUrl({ action: ScreenWall.ACTION });
+        this.ws = new WebSocket(url);
+
+        this.ws.onopen = () => {
+            console.log('[屏幕墙] 已连接');
+        };
+
+        this.ws.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data) as ScreenWallMessage & { links?: ScreenWallLink[] };
+                this.handleMessage(message);
+            } catch (e) {
+                console.error('[屏幕墙] 解析消息失败:', e);
+            }
+        };
+
+        this.ws.onclose = () => {
+            console.log('[屏幕墙] 已断开');
+        };
+
+        this.ws.onerror = (error) => {
+            console.error('[屏幕墙] 错误:', error);
+        };
+    }
+
+    private connectUdp(): void {
+        // 连接到 UDP 服务器以接收广播的视频流
+        console.log('[屏幕墙] 连接到 UDP 服务器');
+        // 注意：由于浏览器安全限制，无法直接使用 UDP 套接字
+        // 这里我们使用 WebSocket 作为备用方案
+        // 实际的 UDP 接收已经在 StreamClientScrcpy 中处理
+    }
+
+    private handleMessage(message: ScreenWallMessage & { links?: ScreenWallLink[] }): void {
+        if (message.links) {
+            this.links = message.links;
+            this.render();
+        }
+    }
+
+    private render(): void {
+        const grid = document.getElementById('screen-wall-grid');
+        if (!grid) return;
+
+        if (this.links.length === 0) {
+            grid.innerHTML = this.getEmptyTemplate();
+            return;
+        }
+
+        this.adjustGridLayout(grid, this.links.length);
+
+        grid.innerHTML = this.links.map((link) => this.getCardTemplate(link)).join('');
+        this.bindEvents();
+    }
+
+    private getCardTemplate(link: ScreenWallLink): string {
+        const bitrateKbps = Math.round((link.bitrate || 200000) / 1000);
+        const fps = link.maxFps || 10;
+        
+        const iframeUrl = this.buildStreamUrl(link);
+        
+        return `
+            <div class="screen-wall-card" data-link-id="${link.id}" data-udid="${encodeURIComponent(link.udid || link.id)}" data-ws="${encodeURIComponent(link.url || '')}">
+                <div class="screen-wall-card-preview">
+                    <iframe id="card-iframe-${link.id}" class="card-iframe" src="${iframeUrl}" frameborder="0"></iframe>
+                    <div class="card-click-overlay" title="点击进入控制模式"></div>
+                    <span class="no-signal hidden" id="no-signal-${link.id}">无信号</span>
+                    <div class="screen-wall-card-info">
+                        <span class="screen-wall-card-name" title="${link.name}">${link.name}</span>
+                        <span class="screen-wall-card-status">
+                            <span class="status-dot offline" id="status-dot-${link.id}"></span>
+                            ${bitrateKbps}kbps / ${fps}fps
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    private bindEvents(): void {
+        const grid = document.getElementById('screen-wall-grid');
+        if (!grid) return;
+        
+        grid.addEventListener('click', (e) => {
+            console.log('[ScreenWall] Click event triggered');
+            const card = (e.target as HTMLElement).closest('.screen-wall-card');
+            if (card) {
+                const udid = decodeURIComponent(card.getAttribute('data-udid') || '');
+                const ws = decodeURIComponent(card.getAttribute('data-ws') || '');
+                console.log('[ScreenWall] Navigating to control:', { udid, ws });
+                this.navigateToControl(udid, ws);
+            }
+        });
+    }
+    
+    private navigateToControl(udid: string, ws: string): void {
+        const wsUrl = ws || 'ws://localhost:8886';
+        const hash = `#!action=stream&udid=${encodeURIComponent(udid)}&ws=${encodeURIComponent(wsUrl)}&player=webcodecs`;
+        console.log('[ScreenWall] Setting hash:', hash);
+        window.location.hash = hash;
+        window.location.reload();
+    }
+
+    private buildStreamUrl(link: ScreenWallLink): string {
+        const url = new URL(window.location.href);
+        // 屏幕墙使用独立的视频设置，避免与控制模式冲突
+        // 默认使用较低的码率和帧率以节省带宽
+        const screenWallParams = new URLSearchParams({
+            bitrate: '2000000',     // 2Mbps
+            maxFps: '15',          // 15fps
+            maxSize: '1920',       // 最大1080p
+            iFrameInterval: '5',
+            sendFrameMeta: 'false',
+        });
+        
+        if (link.udid && link.url) {
+            url.hash = `#!action=stream&udid=${encodeURIComponent(link.udid)}&ws=${encodeURIComponent(link.url)}&player=webcodecs&hiddenUI=true&${screenWallParams.toString()}`;
+        } else if (link.udid) {
+            const wsUrl = `ws://localhost:8886`;
+            url.hash = `#!action=stream&udid=${encodeURIComponent(link.udid)}&ws=${encodeURIComponent(wsUrl)}&player=webcodecs&hiddenUI=true&${screenWallParams.toString()}`;
+        } else if (link.url) {
+            url.hash = `#!action=stream&udid=${encodeURIComponent(link.id)}&ws=${encodeURIComponent(link.url)}&player=webcodecs&hiddenUI=true&${screenWallParams.toString()}`;
+        }
+        
+        return url.toString();
+    }
+
+    private adjustGridLayout(grid: HTMLElement, deviceCount: number): void {
+        let columns: number;
+        
+        if (deviceCount === 1) {
+            columns = 1;
+        } else if (deviceCount === 2) {
+            columns = 2;
+        } else if (deviceCount <= 4) {
+            columns = 2;
+        } else if (deviceCount <= 6) {
+            columns = 3;
+        } else if (deviceCount <= 9) {
+            columns = 3;
+        } else {
+            columns = 4;
+        }
+
+        grid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+        grid.classList.add('dynamic-layout');
+    }
+
+    public static parseParameters(_params: URLSearchParams): ScreenWallParams {
+        return {
+            action: ACTION.SCREEN_WALL,
+        };
+    }
+}

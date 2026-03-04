@@ -1,19 +1,71 @@
 .text-area {
     width: 100%;
+    box-sizing: border-box;
     resize: vertical;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--text-color);
+    padding: 8px 12px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.text-area:focus {
+    outline: none;
+    border-color: #00d9ff;
+    box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.2);
 }
 
 .more-box {
     display: none;
     position: absolute;
-    background-color: var(--controls-bg-color);
-    z-index: 2;
-    padding: 0 .714rem .714rem .714rem;
+    bottom: 80px;
+    left: 20px;
+    background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
+    z-index: 100;
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+    min-width: 400px;
+    max-width: calc(100vw - 40px) !important;
+    width: auto !important;
+    box-sizing: border-box;
 }
 
 .text-with-shadow, .more-box label {
     color: var(--text-color);
-    text-shadow: var(--text-shadow-color) 0 0 .357rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.more-box p {
+    margin: 12px 0;
+}
+
+.more-box button {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin: 2px;
+}
+
+.more-box button:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: #00d9ff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 217, 255, 0.3);
+}
+
+.more-box button:active {
+    transform: translateY(0);
 }
 
 .spoiler > input ~ .box {
@@ -22,11 +74,32 @@
 
 .spoiler > input:checked ~ .box {
     display: block;
+    margin-top: 12px;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.spoiler > label {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.spoiler > label:hover {
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .spoiler > label::before {
     content: '►';
-    margin-right: 5px;
+    margin-right: 8px;
+    transition: transform 0.2s ease;
 }
 
 .spoiler > input:checked ~ label::before {
@@ -35,9 +108,68 @@
 
 .spoiler > input:checked ~ div {
     display: block;
-    padding: 10px;
 }
 
 .spoiler > input {
     display: none;
+}
+
+.spoiler .box div {
+    margin-bottom: 12px;
+}
+
+.spoiler .box label {
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.8);
+    min-width: 90px;
+}
+
+.spoiler .box input {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: #ffffff;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.spoiler .box input:focus {
+    outline: none;
+    border-color: #00d9ff;
+    box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.2);
+}
+
+@media (max-width: 500px) {
+    .more-box {
+        left: 10px !important;
+        right: 10px !important;
+        min-width: auto !important;
+        max-width: none !important;
+        width: auto !important;
+        padding: 12px;
+    }
+
+    .spoiler .box {
+        padding: 12px;
+    }
+
+    .more-box button {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .spoiler .box input {
+        width: 100%;
+        box-sizing: border-box;
+    }
+}
+
+@media (max-width: 600px) {
+    .more-box {
+        max-width: calc(100vw - 40px) !important;
+        width: auto !important;
+    }
 }

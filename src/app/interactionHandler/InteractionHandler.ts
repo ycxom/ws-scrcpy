@@ -211,46 +211,55 @@ export abstract class InteractionHandler {
         const { width, height } = screenInfo.videoSize;
         const target: HTMLElement = event.target as HTMLElement;
         const rect = target.getBoundingClientRect();
-        let { clientWidth, clientHeight } = target;
-        let touchX = event.clientX - rect.left;
-        let touchY = event.clientY - rect.top;
+        
+        // 计算缩放比例
+        const containerWidth = rect.width;
+        const containerHeight = rect.height;
+        
+        // 计算视频的实际显示区域（考虑宽高比）
+        let realWidth = containerWidth;
+        let realHeight = containerHeight;
+        let offsetX = 0;
+        let offsetY = 0;
+        
+        const ratio = width / height;
+        const containerRatio = containerWidth / containerHeight;
+        
+        if (ratio > containerRatio) {
+            // 视频更宽，高度自适应
+            realHeight = containerWidth / ratio;
+            offsetY = (containerHeight - realHeight) / 2;
+        } else {
+            // 视频更高，宽度自适应
+            realWidth = containerHeight * ratio;
+            offsetX = (containerWidth - realWidth) / 2;
+        }
+        
+        // 计算触摸坐标（相对于实际视频区域）
+        let touchX = event.clientX - rect.left - offsetX;
+        let touchY = event.clientY - rect.top - offsetY;
+        
+        // 验证触摸坐标是否在视频区域内
         let invalid = false;
-        if (touchX < 0 || touchX > clientWidth || touchY < 0 || touchY > clientHeight) {
+        if (touchX < 0 || touchX > realWidth || touchY < 0 || touchY > realHeight) {
             invalid = true;
         }
-        const eps = 1e5;
-        const ratio = width / height;
-        const shouldBe = Math.round(eps * ratio);
-        const haveNow = Math.round((eps * clientWidth) / clientHeight);
-        if (shouldBe > haveNow) {
-            const realHeight = Math.ceil(clientWidth / ratio);
-            const top = (clientHeight - realHeight) / 2;
-            if (touchY < top || touchY > top + realHeight) {
-                invalid = true;
-            }
-            touchY -= top;
-            clientHeight = realHeight;
-        } else if (shouldBe < haveNow) {
-            const realWidth = Math.ceil(clientHeight * ratio);
-            const left = (clientWidth - realWidth) / 2;
-            if (touchX < left || touchX > left + realWidth) {
-                invalid = true;
-            }
-            touchX -= left;
-            clientWidth = realWidth;
-        }
-        const x = (touchX * width) / clientWidth;
-        const y = (touchY * height) / clientHeight;
+        
+        // 计算最终的视频坐标
+        const x = (touchX * width) / realWidth;
+        const y = (touchY * height) / realHeight;
+        
         const size = new Size(width, height);
         const point = new Point(x, y);
         const position = new Position(point, size);
+        
         if (x < 0 || y < 0 || x > width || y > height) {
             invalid = true;
         }
         return {
             client: {
-                width: clientWidth,
-                height: clientHeight,
+                width: realWidth,
+                height: realHeight,
             },
             touch: {
                 invalid,

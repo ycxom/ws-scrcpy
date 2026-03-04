@@ -79,7 +79,16 @@ body.shell {
 }
 
 body.stream {
-    background-color: var(--stream-bg-color);
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .terminal-container {
@@ -103,46 +112,165 @@ body.stream {
 
 .device-view {
     z-index: 1;
-    float: right;
-    display: inline-block;
+    float: none !important;
+    display: flex;
+    flex-direction: column;
+    transform-origin: center center;
+    width: 100%;
+    height: 100%;
+}
+
+.video {
+    float: none !important;
+    background-color: #000000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.video-layer, .touch-layer {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform-origin: center center;
 }
 
 .video-layer {
-    position: absolute;
     z-index: 0;
 }
 
 .touch-layer {
-    position: absolute;
     z-index: 1;
 }
 
-.video {
-    float: right;
-    max-height: 100%;
-    max-width: 100%;
-    background-color: #000000;
+.bottom-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(0deg, rgba(26, 26, 46, 0.98) 0%, rgba(22, 33, 62, 0.95) 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 12px 20px;
+    gap: 20px;
 }
 
-
 .control-buttons-list {
-    float: right;
-    width: 3.715rem;
-    background-color: var(--control-buttons-bg-color);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    width: auto;
+    background: transparent;
+    border-left: none;
+    padding: 0;
 }
 
 .control-button {
-    margin: .357rem .786rem;
+    margin: 0;
     padding: 0;
-    width: 2.143rem;
-    height: 2.143rem;
+    width: 48px;
+    height: 48px;
     border: none;
-    opacity: 0.75;
-    background-color: var(--control-buttons-bg-color);
+    opacity: 0.85;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.control-button svg,
+.control-button img,
+.control-button .image {
+    display: block !important;
+    width: 28px !important;
+    height: 28px !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.control-button .image {
+    display: block !important;
 }
 
 .control-button:hover {
     opacity: 1;
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.08);
+    box-shadow: 0 4px 16px rgba(0, 217, 255, 0.3);
+}
+
+.control-button:active {
+    transform: scale(0.95);
+}
+
+@media (max-width: 500px) {
+    .bottom-bar {
+        padding: 8px 10px;
+        gap: 10px;
+    }
+
+    .control-buttons-list {
+        gap: 4px;
+    }
+
+    .control-button {
+        width: 36px !important;
+        height: 36px !important;
+        border-radius: 10px !important;
+    }
+
+    .control-button svg,
+    .control-button img,
+    .control-button .image {
+        width: 22px !important;
+        height: 22px !important;
+        position: absolute !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+    }
+}
+
+@media (max-width: 360px) {
+    .bottom-bar {
+        padding: 6px 6px;
+        gap: 6px;
+    }
+
+    .control-buttons-list {
+        gap: 3px;
+    }
+
+    .control-button {
+        width: 30px !important;
+        height: 30px !important;
+        border-radius: 8px !important;
+    }
+
+    .control-button svg,
+    .control-button img,
+    .control-button .image {
+        width: 18px !important;
+        height: 18px !important;
+        position: absolute !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+    }
 }
 
 .control-wrapper > input[type=checkbox] {

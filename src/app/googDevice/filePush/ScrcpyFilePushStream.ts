@@ -1,5 +1,5 @@
 import { FilePushStream } from './FilePushStream';
-import { StreamReceiverScrcpy } from '../client/StreamReceiverScrcpy';
+import { StreamReceiver } from '../../client/StreamReceiver';
 import DeviceMessage from '../DeviceMessage';
 import { CommandControlMessage, FilePushState } from '../../controlMessage/CommandControlMessage';
 
@@ -7,7 +7,7 @@ const ALLOWED_TYPES = ['application/vnd.android.package-archive'];
 const ALLOWED_NAME_RE = /\.apk$/i;
 
 export class ScrcpyFilePushStream extends FilePushStream {
-    constructor(private readonly streamReceiver: StreamReceiverScrcpy) {
+    constructor(private readonly streamReceiver: StreamReceiver<any>) {
         super();
         streamReceiver.on('deviceMessage', this.onDeviceMessage);
     }

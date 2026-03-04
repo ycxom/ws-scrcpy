@@ -1,12 +1,20 @@
 import '../style/app.css';
+import '../style/screenwall.css';
 import { StreamClientScrcpy } from './googDevice/client/StreamClientScrcpy';
 import { HostTracker } from './client/HostTracker';
 import { Tool } from './client/Tool';
+import { ScreenWall } from './screenwall/ScreenWall';
 
 window.onload = async function (): Promise<void> {
     const hash = location.hash.replace(/^#!/, '');
     const parsedQuery = new URLSearchParams(hash);
     const action = parsedQuery.get('action');
+
+    if (!action || action === ScreenWall.ACTION) {
+        ScreenWall.parseParameters(parsedQuery);
+        new ScreenWall();
+        return;
+    }
 
     /// #if USE_BROADWAY
     const { BroadwayPlayer } = await import('./player/BroadwayPlayer');

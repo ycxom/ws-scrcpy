@@ -27,7 +27,7 @@ export class WebCodecsPlayer extends BaseCanvasBasedPlayer {
         bitrate: 524288,
         maxFps: 24,
         iFrameInterval: 5,
-        bounds: new Size(480, 480),
+        bounds: new Size(1920, 1920),
         sendFrameMeta: false,
     });
 
@@ -74,6 +74,7 @@ export class WebCodecsPlayer extends BaseCanvasBasedPlayer {
     private hadIDR = false;
     private bufferedSPS = false;
     private bufferedPPS = false;
+    private resizeObserver?: ResizeObserver;
 
     constructor(udid: string, displayInfo?: DisplayInfo, name = WebCodecsPlayer.playerFullName) {
         super(udid, displayInfo, name, WebCodecsPlayer.storageKeyPrefix);
@@ -91,8 +92,7 @@ export class WebCodecsPlayer extends BaseCanvasBasedPlayer {
                 this.onFrameDecoded(0, 0, frame);
             },
             error: (error: DOMException) => {
-                console.error(error, `code: ${error.code}`);
-                this.stop();
+                console.warn('[WebCodecsPlayer] Decode error (non-fatal):', error.message);
             },
         });
     }
@@ -106,30 +106,44 @@ export class WebCodecsPlayer extends BaseCanvasBasedPlayer {
         } else {
             array = data;
         }
-        this.buffer = array.buffer;
+        this.buffer = array.buffer as ArrayBuffer;
         return array;
     }
 
     protected scaleCanvas(width: number, height: number): void {
-        const videoSize = new Size(width, height);
-        let scale = 1;
-        if (this.bounds && !this.bounds.intersect(videoSize).equals(videoSize)) {
-            scale = Math.min(this.bounds.w / width, this.bounds.h / height);
-        }
-        const w = width * scale;
-        const h = height * scale;
-        const screenInfo = new ScreenInfo(new Rect(0, 0, width, height), new Size(w, h), 0);
+        const screenInfo = new ScreenInfo(new Rect(0, 0, width, height), new Size(width, height), 0);
         this.emit('input-video-resize', screenInfo);
         this.setScreenInfo(screenInfo);
 
         // FIXME: canvas was initialized from `.setScreenInfo()` call above, but with wrong values
         this.initCanvas(width, height);
-        if (scale !== 1) {
-            this.tag.style.transform = `scale(${scale.toFixed(4)})`;
-        } else {
-            this.tag.style.transform = ``;
+        
+        // 延迟应用缩放，确保 parent 元素已经布局好
+        requestAnimationFrame(() => {
+            this.applyScaling();
+        });
+    }
+
+    private applyScaling(): void {
+        if (!this.parentElement) {
+            return;
         }
-        this.tag.style.transformOrigin = 'top left';
+        const containerWidth = this.parentElement.clientWidth;
+        const containerHeight = this.parentElement.clientHeight;
+        const videoWidth = this.tag.width;
+        const videoHeight = this.tag.height;
+
+        if (videoWidth === 0 || videoHeight === 0 || containerWidth === 0 || containerHeight === 0) {
+            return;
+        }
+
+        // 确保完整显示视频，不裁剪，适用于屏幕墙模式和控制模式
+        const scaleX = containerWidth / videoWidth;
+        const scaleY = containerHeight / videoHeight;
+        const scale = Math.min(scaleX, scaleY);
+
+        this.tag.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        this.touchableCanvas.style.transform = `translate(-50%, -50%) scale(${scale})`;
     }
 
     protected decode(data: Uint8Array): void {
@@ -167,13 +181,17 @@ export class WebCodecsPlayer extends BaseCanvasBasedPlayer {
             this.buffer = undefined;
             this.bufferedPPS = false;
             this.bufferedSPS = false;
-            this.decoder.decode(
-                new EncodedVideoChunk({
-                    type: 'key',
-                    timestamp: 0,
-                    data: array.buffer,
-                }),
-            );
+            try {
+                this.decoder.decode(
+                    new EncodedVideoChunk({
+                        type: isIDR ? 'key' : 'delta',
+                        timestamp: 0,
+                        data: array.buffer,
+                    }),
+                );
+            } catch (e) {
+                console.warn('[WebCodecsPlayer] Decode failed, skipping:', e);
+            }
             return;
         }
     }
@@ -214,10 +232,28 @@ export class WebCodecsPlayer extends BaseCanvasBasedPlayer {
         return false;
     }
 
+    public setParent(parent: HTMLElement): void {
+        super.setParent(parent);
+        
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+        }
+        
+        this.resizeObserver = new ResizeObserver(() => {
+            this.applyScaling();
+        });
+        
+        this.resizeObserver.observe(parent);
+    }
+
     public stop(): void {
         super.stop();
         if (this.decoder.state === 'configured') {
             this.decoder.close();
+        }
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = undefined;
         }
     }
 }

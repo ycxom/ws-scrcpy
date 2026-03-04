@@ -1,0 +1,3 @@
+server:
+  - secure: false
+    port: 2583

@@ -11,4 +11,5 @@ export const Attribute = {
     PORT: 'data-port',
     PATHNAME: 'data-pathname',
     VALUE: 'data-value',
+    LINK_ID: 'data-link-id',
 };

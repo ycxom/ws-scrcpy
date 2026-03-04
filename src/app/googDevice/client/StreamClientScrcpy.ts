@@ -28,6 +28,7 @@ import { Attribute } from '../../Attribute';
 import { HostTracker } from '../../client/HostTracker';
 import { ACTION } from '../../../common/Action';
 import { StreamReceiverScrcpy } from './StreamReceiverScrcpy';
+import { UdpStreamReceiver } from './UdpStreamReceiver';
 import { ParamsDeviceTracker } from '../../../types/ParamsDeviceTracker';
 import { ScrcpyFilePushStream } from '../filePush/ScrcpyFilePushStream';
 
@@ -48,7 +49,7 @@ export class StreamClientScrcpy
     public static ACTION = 'stream';
     private static players: Map<string, PlayerClass> = new Map<string, PlayerClass>();
 
-    private controlButtons?: HTMLElement;
+
     private deviceName = '';
     private clientId = -1;
     private clientsCount = -1;
@@ -59,7 +60,8 @@ export class StreamClientScrcpy
     private player?: BasePlayer;
     private filePushHandler?: FilePushHandler;
     private fitToScreen?: boolean;
-    private readonly streamReceiver: StreamReceiverScrcpy;
+    private readonly streamReceiver: StreamReceiverScrcpy | UdpStreamReceiver;
+    private readonly useUdp: boolean;
 
     public static registerPlayer(playerClass: PlayerClass): void {
         if (playerClass.isSupported()) {
@@ -129,22 +131,73 @@ export class StreamClientScrcpy
 
     protected constructor(
         params: ParamsStreamScrcpy,
-        streamReceiver?: StreamReceiverScrcpy,
+        streamReceiver?: StreamReceiverScrcpy | UdpStreamReceiver,
         player?: BasePlayer,
         fitToScreen?: boolean,
         videoSettings?: VideoSettings,
     ) {
         super(params);
+        this.useUdp = !!params.hiddenUI; // 屏幕墙模式使用 UDP
         if (streamReceiver) {
             this.streamReceiver = streamReceiver;
+        } else if (this.useUdp) {
+            this.streamReceiver = new UdpStreamReceiver(this.params);
         } else {
             this.streamReceiver = new StreamReceiverScrcpy(this.params);
+        }
+
+        if (params.hiddenUI) {
+            const style = document.createElement('style');
+            style.textContent = `
+                body.stream {
+                    margin: 0;
+                    padding: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 100vw;
+                    height: 100vh;
+                    overflow: hidden;
+                }
+                .device-view {
+                    float: none !important;
+                    max-width: 100% !important;
+                    max-height: 100% !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                    display: flex !important;
+                }
+                .video {
+                    float: none !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    flex: 1 !important;
+                }
+                .video > div,
+                .video > canvas {
+                    /* 让 WebCodecsPlayer 的 transform 缩放来处理 */
+                }
+                .video-layer,
+                .touch-layer {
+                    /* 让 WebCodecsPlayer 的 transform 缩放来处理 */
+                }
+            `;
+            document.head.appendChild(style);
         }
 
         const { udid, player: playerName } = this.params;
         this.startStream({ udid, player, playerName, fitToScreen, videoSettings });
         this.setBodyClass('stream');
+        
+        if (!params.hiddenUI) {
+            this.fitToScreen = true;
+        }
     }
+    
+
 
     public static parseParameters(params: URLSearchParams): ParamsStreamScrcpy {
         const typedParams = super.parseParameters(params);
@@ -152,12 +205,35 @@ export class StreamClientScrcpy
         if (action !== ACTION.STREAM_SCRCPY) {
             throw Error('Incorrect action');
         }
+        const hiddenUI = Util.parseBoolean(params, 'hiddenUI', false);
+
+        // 解析视频设置参数（屏幕墙模式使用独立的设置）
+        let videoSettings: VideoSettings | undefined;
+        const bitrate = Util.parseInt(params, 'bitrate', false);
+        const maxFps = Util.parseInt(params, 'maxFps', false);
+        const maxSize = Util.parseInt(params, 'maxSize', false);
+        const iFrameInterval = Util.parseInt(params, 'iFrameInterval', false);
+
+        if (bitrate || maxFps || maxSize) {
+            // 从 URL 参数创建设置，不从 localStorage 加载
+            videoSettings = new VideoSettings({
+                bitrate: bitrate || 524288,
+                maxFps: maxFps || 24,
+                bounds: maxSize ? new Size(maxSize, maxSize) : new Size(1920, 1920),
+                iFrameInterval: iFrameInterval || 5,
+                sendFrameMeta: Util.parseBoolean(params, 'sendFrameMeta', false),
+                lockedVideoOrientation: -1,
+            });
+        }
+
         return {
             ...typedParams,
             action,
             player: Util.parseString(params, 'player', true),
             udid: Util.parseString(params, 'udid', true),
             ws: Util.parseString(params, 'ws', true),
+            hiddenUI,
+            videoSettings,
         };
     }
 
@@ -285,11 +361,6 @@ export class StreamClientScrcpy
             player = p;
         }
         this.player = player;
-        this.setTouchListeners(player);
-
-        if (!videoSettings) {
-            videoSettings = player.getVideoSettings();
-        }
 
         const deviceView = document.createElement('div');
         deviceView.className = 'device-view';
@@ -302,9 +373,15 @@ export class StreamClientScrcpy
             if (parent) {
                 parent.removeChild(deviceView);
             }
-            parent = moreBox.parentElement;
-            if (parent) {
-                parent.removeChild(moreBox);
+            if (moreBox) {
+                parent = moreBox.parentElement;
+                if (parent) {
+                    parent.removeChild(moreBox);
+                }
+            }
+            // 停止 UDP 接收器（如果使用 UDP）
+            if (this.useUdp && 'stopUdp' in this.streamReceiver) {
+                this.streamReceiver.stopUdp();
             }
             this.streamReceiver.stop();
             if (this.player) {
@@ -312,31 +389,65 @@ export class StreamClientScrcpy
             }
         };
 
-        const googMoreBox = (this.moreBox = new GoogMoreBox(udid, player, this));
-        const moreBox = googMoreBox.getHolderElement();
-        googMoreBox.setOnStop(stop);
-        const googToolBox = GoogToolBox.createToolBox(udid, player, this, moreBox);
-        this.controlButtons = googToolBox.getHolderElement();
-        deviceView.appendChild(this.controlButtons);
+        const isHiddenUI = !!this.params.hiddenUI;
+
+        let moreBox: HTMLElement | undefined;
+        let controlButtons: HTMLElement | undefined;
+        if (!isHiddenUI) {
+            const googMoreBox = (this.moreBox = new GoogMoreBox(udid, player, this));
+            moreBox = googMoreBox.getHolderElement();
+            googMoreBox.setOnStop(stop);
+            const googToolBox = GoogToolBox.createToolBox(udid, player, this, moreBox);
+            controlButtons = googToolBox.getHolderElement();
+        }
+
         const video = document.createElement('div');
         video.className = 'video';
         deviceView.appendChild(video);
-        deviceView.appendChild(moreBox);
+        
+        const bottomBar = document.createElement('div');
+        bottomBar.className = 'bottom-bar';
+        
+        if (controlButtons && !isHiddenUI) {
+            bottomBar.appendChild(controlButtons);
+        }
+        
+        deviceView.appendChild(bottomBar);
+        
+        if (moreBox && !isHiddenUI) {
+            deviceView.appendChild(moreBox);
+        }
+
         player.setParent(video);
         player.pause();
 
         document.body.appendChild(deviceView);
+
+        if (!videoSettings) {
+            // 屏幕墙模式使用默认设置，不从 localStorage 加载
+            if (isHiddenUI) {
+                videoSettings = player.getPreferredVideoSetting();
+            } else {
+                videoSettings = player.getVideoSettings();
+            }
+        }
+        
         if (fitToScreen) {
             const newBounds = this.getMaxSize();
             if (newBounds) {
                 videoSettings = StreamClientScrcpy.createVideoSettingsWithBounds(videoSettings, newBounds);
             }
         }
-        this.applyNewVideoSettings(videoSettings, false);
-        const element = player.getTouchableElement();
-        const logger = new DragAndPushLogger(element);
-        this.filePushHandler = new FilePushHandler(element, new ScrcpyFilePushStream(this.streamReceiver));
-        this.filePushHandler.addEventListener(logger);
+        // 屏幕墙模式不保存设置到 localStorage
+        this.applyNewVideoSettings(videoSettings, !isHiddenUI);
+        
+        if (!isHiddenUI) {
+            this.setTouchListeners(player);
+            const element = player.getTouchableElement();
+            const logger = new DragAndPushLogger(element);
+            this.filePushHandler = new FilePushHandler(element, new ScrcpyFilePushStream(this.streamReceiver));
+            this.filePushHandler.addEventListener(logger);
+        }
 
         const streamReceiver = this.streamReceiver;
         streamReceiver.on('deviceMessage', this.OnDeviceMessage);
@@ -344,6 +455,12 @@ export class StreamClientScrcpy
         streamReceiver.on('clientsStats', this.onClientsStats);
         streamReceiver.on('displayInfo', this.onDisplayInfo);
         streamReceiver.on('disconnected', this.onDisconnected);
+        
+        // 启动 UDP 接收器（如果使用 UDP）
+        if (this.useUdp && 'startUdp' in streamReceiver) {
+            streamReceiver.startUdp();
+        }
+        
         console.log(TAG, player.getName(), udid);
     }
 
@@ -381,12 +498,10 @@ export class StreamClientScrcpy
     }
 
     public getMaxSize(): Size | undefined {
-        if (!this.controlButtons) {
-            return;
-        }
         const body = document.body;
-        const width = (body.clientWidth - this.controlButtons.clientWidth) & ~15;
-        const height = body.clientHeight & ~15;
+        const bottomBarHeight = 80;
+        const width = body.clientWidth & ~15;
+        const height = (body.clientHeight - bottomBarHeight) & ~15;
         return new Size(width, height);
     }
 
