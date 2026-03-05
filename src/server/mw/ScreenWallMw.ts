@@ -21,6 +21,8 @@ export class ScreenWallService {
     private clients: Set<WS> = new Set();
     private proxies: Map<string, ScreenWallProxy> = new Map();
     private autoAddedDevices: Set<string> = new Set();
+    private uuidToLinkId: Map<string, string> = new Map();
+    private linkIdToUuid: Map<string, string> = new Map();
 
     public static readonly DEFAULT_MAX_FPS = 10;
     public static readonly DEFAULT_BITRATE = 200000;
@@ -28,7 +30,18 @@ export class ScreenWallService {
     public static readonly MIN_BITRATE = 100000;
 
     private constructor() {
+        this.clearAllLinks();
         this.initAutoDiscovery();
+    }
+
+    private clearAllLinks(): void {
+        for (const linkId of Array.from(this.links.keys())) {
+            if (linkId.startsWith('auto_')) {
+                this.removeLink(linkId);
+            }
+        }
+        this.autoAddedDevices.clear();
+        console.log('[ScreenWallMw] Cleared all auto-added links');
     }
 
     private initAutoDiscovery(): void {
@@ -57,24 +70,17 @@ export class ScreenWallService {
         const linkId = `auto_${udid}`;
         
         if (device.state === 'device') {
-            if (this.autoAddedDevices.has(udid)) {
-                return;
-            }
-
             let deviceName = device['ro.product.model'] || device.udid;
             let deviceUrl = '';
 
-            if (device.interfaces && device.interfaces.length > 0) {
-                for (const iface of device.interfaces) {
-                    if (iface.ipv4 && iface.ipv4 !== '127.0.0.1') {
-                        deviceUrl = `ws://${iface.ipv4}:8886`;
-                        break;
-                    }
-                }
-            }
-
-            if (!deviceUrl && device.pid !== -1) {
-                deviceUrl = `ws://localhost:8886`;
+            if (device.pid !== -1) {
+                const proxyUrl = new URL('http://localhost:3003');
+                proxyUrl.pathname = '/';
+                proxyUrl.searchParams.set('action', 'proxy-adb');
+                proxyUrl.searchParams.set('remote', 'tcp:8886');
+                proxyUrl.searchParams.set('udid', udid);
+                
+                deviceUrl = proxyUrl.toString();
             }
 
             const link: ScreenWallLink = {
@@ -87,9 +93,15 @@ export class ScreenWallService {
                 udid: udid,
             };
 
-            this.autoAddedDevices.add(udid);
-            this.addLink(link);
-            console.log(`[ScreenWallMw] Auto-added device: ${deviceName} (${udid})`);
+            if (this.autoAddedDevices.has(udid)) {
+                this.removeLink(linkId);
+                this.addLink(link);
+                console.log(`[ScreenWallMw] Auto-updated device: ${deviceName} (${udid})`);
+            } else {
+                this.autoAddedDevices.add(udid);
+                this.addLink(link);
+                console.log(`[ScreenWallMw] Auto-added device: ${deviceName} (${udid})`);
+            }
         } else {
             if (this.autoAddedDevices.has(udid)) {
                 this.autoAddedDevices.delete(udid);
@@ -131,6 +143,7 @@ export class ScreenWallService {
             useProxy: link.useProxy !== undefined ? link.useProxy : true,
         };
         this.links.set(id, fullLink);
+        this.getOrCreateUuid(id);
         this.broadcast({
             type: 'add',
             data: fullLink,
@@ -138,6 +151,7 @@ export class ScreenWallService {
     }
 
     public removeLink(id: string): boolean {
+        this.removeUuidMappings(id);
         const deleted = this.links.delete(id);
         if (deleted) {
             this.broadcast({ type: 'remove', data: { id } as ScreenWallLink });
@@ -188,8 +202,12 @@ export class ScreenWallService {
             type: 'list',
             data: undefined,
         };
+        const linksWithUuid = this.getLinks().map(link => ({
+            ...link,
+            uuid: this.getOrCreateUuid(link.id),
+        }));
         if (ws.readyState === WS.OPEN) {
-            ws.send(JSON.stringify({ ...message, links: this.getLinks() }));
+            ws.send(JSON.stringify({ ...message, links: linksWithUuid }));
         }
     }
 
@@ -222,6 +240,40 @@ export class ScreenWallService {
     public getProxy(linkId: string): ScreenWallProxy | undefined {
         return this.proxies.get(linkId);
     }
+
+    private generateUuid(): string {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    public getOrCreateUuid(linkId: string): string {
+        let uuid = this.linkIdToUuid.get(linkId);
+        if (!uuid) {
+            uuid = this.generateUuid();
+            this.linkIdToUuid.set(linkId, uuid);
+            this.uuidToLinkId.set(uuid, linkId);
+        }
+        return uuid;
+    }
+
+    public getLinkByUuid(uuid: string): ScreenWallLink | undefined {
+        const linkId = this.uuidToLinkId.get(uuid);
+        if (linkId) {
+            return this.links.get(linkId);
+        }
+        return undefined;
+    }
+
+    public removeUuidMappings(linkId: string): void {
+        const uuid = this.linkIdToUuid.get(linkId);
+        if (uuid) {
+            this.linkIdToUuid.delete(linkId);
+            this.uuidToLinkId.delete(uuid);
+        }
+    }
 }
 
 export class ScreenWallProxy extends Mw {
@@ -244,13 +296,28 @@ export class ScreenWallProxy extends Mw {
         this.name = `[${ScreenWallProxy.TAG}{${remoteUrl}}]`;
 
         try {
-            const url = new URL(remoteUrl);
             let wsUrl = remoteUrl;
+            
+            const url = new URL(remoteUrl);
+            const action = url.searchParams.get('action');
 
-            if (this.link.useProxy) {
-                const proxyUrl = new URL('/?action=proxy-ws', `${url.protocol}//${url.host}`);
+            if (action === 'proxy-adb') {
+                const wsProxyUrl = new URL(remoteUrl);
+                wsProxyUrl.protocol = wsProxyUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+                wsUrl = wsProxyUrl.toString();
+            } else if (this.link.useProxy) {
+                const proxyUrl = new URL('http://localhost:3003');
+                proxyUrl.pathname = '/';
+                proxyUrl.search = '';
+                proxyUrl.hash = '';
+                proxyUrl.searchParams.set('action', 'proxy-ws');
                 proxyUrl.searchParams.set('ws', remoteUrl);
+                proxyUrl.protocol = 'ws:';
                 wsUrl = proxyUrl.toString();
+            } else if (!remoteUrl.startsWith('ws://') && !remoteUrl.startsWith('wss://')) {
+                const wsUrlObj = new URL(remoteUrl);
+                wsUrlObj.protocol = wsUrlObj.protocol === 'https:' ? 'wss:' : 'ws:';
+                wsUrl = wsUrlObj.toString();
             }
 
             this.remoteSocket = new WS(wsUrl);

@@ -9,6 +9,7 @@ import { TypedEmitter } from '../../common/TypedEmitter';
 import * as process from 'process';
 import { EnvName } from '../EnvName';
 import { HlsStreamService } from './HlsStreamService';
+import { ScreenWallService } from '../mw/ScreenWallMw';
 
 const DEFAULT_STATIC_DIR = path.join(__dirname, './public');
 
@@ -107,6 +108,31 @@ export class HttpServer extends TypedEmitter<HttpServerEvents> implements Servic
                 res.send(tsData);
             } else {
                 res.status(404).send('Segment not found');
+            }
+        });
+
+        this.mainApp.get('/api/device-by-uuid/:uuid', (req, res) => {
+            const uuid = req.params.uuid;
+            console.log(`[HttpServer] Requesting device info for UUID: ${uuid}`);
+            
+            const link = ScreenWallService.getInstance().getLinkByUuid(uuid);
+            if (link) {
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.send({
+                    success: true,
+                    data: {
+                        udid: link.udid || link.id,
+                        url: link.url,
+                    },
+                });
+            } else {
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.status(404).send({
+                    success: false,
+                    error: 'Device not found',
+                });
             }
         });
         

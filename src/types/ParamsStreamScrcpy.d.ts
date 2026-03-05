@@ -5,6 +5,7 @@ import VideoSettings from '../app/VideoSettings';
 export interface ParamsStreamScrcpy extends ParamsStream {
     action: ACTION.STREAM_SCRCPY;
     ws: string;
+    uuid?: string;
     fitToScreen?: boolean;
     videoSettings?: VideoSettings;
     hiddenUI?: boolean;

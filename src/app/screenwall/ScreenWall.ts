@@ -32,13 +32,14 @@ export class ScreenWall extends ScreenWallBase {
     public static readonly ACTION = ACTION.SCREEN_WALL;
     private links: ScreenWallLink[] = [];
     private ws: WebSocket | null = null;
+    private gridColumns: number = 0;
+    private gridRows: number = 0;
 
     constructor() {
         super({ action: ScreenWall.ACTION });
         this.setBodyClass('screen-wall');
         this.initUI();
         this.connect();
-        this.connectUdp();
     }
 
     private buildUrl(params: Record<string, string>): string {
@@ -55,13 +56,29 @@ export class ScreenWall extends ScreenWallBase {
         container.id = 'screen-wall-container';
         container.innerHTML = this.getTemplate();
         document.body.appendChild(container);
+        
+        this.loadGridConfig();
         this.bindEvents();
+        this.bindGridConfigEvents();
     }
 
     private getTemplate(): string {
         return `
             <div id="screen-wall-header">
                 <h1>屏幕墙</h1>
+                <div class="screen-wall-controls">
+                    <div class="grid-config">
+                        <label>
+                            列数:
+                            <input type="number" id="grid-columns" min="0" max="10" value="0" placeholder="自动">
+                        </label>
+                        <label>
+                            行数:
+                            <input type="number" id="grid-rows" min="0" max="10" value="0" placeholder="自动">
+                        </label>
+                        <button id="apply-grid-config" class="screen-wall-btn screen-wall-btn-primary">应用</button>
+                    </div>
+                </div>
             </div>
             <div id="screen-wall-grid" class="screen-wall-grid">
                 ${this.getEmptyTemplate()}
@@ -104,14 +121,6 @@ export class ScreenWall extends ScreenWallBase {
         this.ws.onerror = (error) => {
             console.error('[屏幕墙] 错误:', error);
         };
-    }
-
-    private connectUdp(): void {
-        // 连接到 UDP 服务器以接收广播的视频流
-        console.log('[屏幕墙] 连接到 UDP 服务器');
-        // 注意：由于浏览器安全限制，无法直接使用 UDP 套接字
-        // 这里我们使用 WebSocket 作为备用方案
-        // 实际的 UDP 接收已经在 StreamClientScrcpy 中处理
     }
 
     private handleMessage(message: ScreenWallMessage & { links?: ScreenWallLink[] }): void {
@@ -186,31 +195,9 @@ export class ScreenWall extends ScreenWallBase {
             sendFrameMeta: 'false',
         });
         
-        // 构建代理 URL - 所有设备都通过 node 代理连接
-        let proxyWsUrl = '';
-        if (link.url) {
-            // 如果有设备 URL，使用 proxy-ws action 代理
-            const proxyUrl = new URL(window.location.href);
-            proxyUrl.pathname = '/';
-            proxyUrl.search = '';
-            proxyUrl.hash = '';
-            proxyUrl.searchParams.set('action', 'proxy-ws');
-            proxyUrl.searchParams.set('ws', link.url);
-            
-            // 将 http/https 转换为 ws/wss
-            proxyUrl.protocol = proxyUrl.protocol === 'https:' ? 'wss:' : 'ws:';
-            proxyWsUrl = proxyUrl.toString();
-        }
+        const uuid = link.uuid || link.id;
         
-        const udid = link.udid || link.id;
-        
-        if (proxyWsUrl) {
-            url.hash = `#!action=stream&udid=${encodeURIComponent(udid)}&ws=${encodeURIComponent(proxyWsUrl)}&player=webcodecs&hiddenUI=true&${screenWallParams.toString()}`;
-        } else if (link.udid) {
-            // 对于没有 URL 的本地设备，直接连接到 localhost:8886
-            const wsUrl = `ws://localhost:8886`;
-            url.hash = `#!action=stream&udid=${encodeURIComponent(udid)}&ws=${encodeURIComponent(wsUrl)}&player=webcodecs&hiddenUI=true&${screenWallParams.toString()}`;
-        }
+        url.hash = `#!action=stream&uuid=${encodeURIComponent(uuid)}&player=webcodecs&hiddenUI=true&${screenWallParams.toString()}`;
         
         return url.toString();
     }
@@ -223,51 +210,108 @@ export class ScreenWall extends ScreenWallBase {
             return;
         }
         
-        const udid = link.udid || link.id;
-        let finalWsUrl = link.url || '';
+        const uuid = link.uuid || link.id;
         
-        // 如果有设备 URL，构建代理 URL
-        if (finalWsUrl) {
-            const proxyUrl = new URL(window.location.href);
-            proxyUrl.pathname = '/';
-            proxyUrl.search = '';
-            proxyUrl.hash = '';
-            proxyUrl.searchParams.set('action', 'proxy-ws');
-            proxyUrl.searchParams.set('ws', finalWsUrl);
-            
-            // 将 http/https 转换为 ws/wss
-            proxyUrl.protocol = proxyUrl.protocol === 'https:' ? 'wss:' : 'ws:';
-            finalWsUrl = proxyUrl.toString();
-        } else {
-            // 没有 URL 时使用 localhost:8886
-            finalWsUrl = 'ws://localhost:8886';
-        }
-        
-        const hash = `#!action=stream&udid=${encodeURIComponent(udid)}&ws=${encodeURIComponent(finalWsUrl)}&player=webcodecs`;
+        const hash = `#!action=stream&uuid=${encodeURIComponent(uuid)}&player=webcodecs`;
         console.log('[ScreenWall] Setting hash:', hash);
         window.location.hash = hash;
         window.location.reload();
     }
 
     private adjustGridLayout(grid: HTMLElement, deviceCount: number): void {
-        let columns: number;
-        
-        if (deviceCount === 1) {
-            columns = 1;
-        } else if (deviceCount === 2) {
-            columns = 2;
-        } else if (deviceCount <= 4) {
-            columns = 2;
-        } else if (deviceCount <= 6) {
-            columns = 3;
-        } else if (deviceCount <= 9) {
-            columns = 3;
+        if (this.gridColumns > 0) {
+            grid.style.gridTemplateColumns = `repeat(${this.gridColumns}, 1fr)`;
+            grid.classList.remove('dynamic-layout');
+            grid.classList.add('custom-layout');
         } else {
-            columns = 4;
-        }
+            let columns: number;
+            
+            if (deviceCount === 1) {
+                columns = 1;
+            } else if (deviceCount === 2) {
+                columns = 2;
+            } else if (deviceCount <= 4) {
+                columns = 2;
+            } else if (deviceCount <= 6) {
+                columns = 3;
+            } else if (deviceCount <= 9) {
+                columns = 3;
+            } else {
+                columns = 4;
+            }
 
-        grid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
-        grid.classList.add('dynamic-layout');
+            grid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+            grid.classList.add('dynamic-layout');
+            grid.classList.remove('custom-layout');
+        }
+        grid.style.gap = '20px';
+        grid.style.rowGap = '20px';
+        grid.style.columnGap = '20px';
+    }
+
+    private loadGridConfig(): void {
+        try {
+            const savedColumns = localStorage.getItem('screen-wall-columns');
+            const savedRows = localStorage.getItem('screen-wall-rows');
+            
+            if (savedColumns) {
+                this.gridColumns = parseInt(savedColumns, 10);
+                const columnsInput = document.getElementById('grid-columns') as HTMLInputElement;
+                if (columnsInput) {
+                    columnsInput.value = this.gridColumns.toString();
+                }
+            }
+            
+            if (savedRows) {
+                this.gridRows = parseInt(savedRows, 10);
+                const rowsInput = document.getElementById('grid-rows') as HTMLInputElement;
+                if (rowsInput) {
+                    rowsInput.value = this.gridRows.toString();
+                }
+            }
+        } catch (e) {
+            console.error('[ScreenWall] 加载网格配置失败:', e);
+        }
+    }
+
+    private saveGridConfig(): void {
+        try {
+            if (this.gridColumns > 0) {
+                localStorage.setItem('screen-wall-columns', this.gridColumns.toString());
+            } else {
+                localStorage.removeItem('screen-wall-columns');
+            }
+            
+            if (this.gridRows > 0) {
+                localStorage.setItem('screen-wall-rows', this.gridRows.toString());
+            } else {
+                localStorage.removeItem('screen-wall-rows');
+            }
+        } catch (e) {
+            console.error('[ScreenWall] 保存网格配置失败:', e);
+        }
+    }
+
+    private bindGridConfigEvents(): void {
+        const applyButton = document.getElementById('apply-grid-config');
+        if (applyButton) {
+            applyButton.addEventListener('click', () => {
+                const columnsInput = document.getElementById('grid-columns') as HTMLInputElement;
+                const rowsInput = document.getElementById('grid-rows') as HTMLInputElement;
+                
+                this.gridColumns = columnsInput ? parseInt(columnsInput.value, 10) || 0 : 0;
+                this.gridRows = rowsInput ? parseInt(rowsInput.value, 10) || 0 : 0;
+                
+                this.saveGridConfig();
+                
+                if (this.links.length > 0) {
+                    const grid = document.getElementById('screen-wall-grid');
+                    if (grid) {
+                        this.adjustGridLayout(grid, this.links.length);
+                    }
+                }
+            });
+        }
     }
 
     public static parseParameters(_params: URLSearchParams): ScreenWallParams {

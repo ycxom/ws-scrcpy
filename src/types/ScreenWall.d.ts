@@ -6,6 +6,7 @@ export interface ScreenWallLink {
     maxFps?: number;
     useProxy?: boolean;
     udid?: string;
+    uuid?: string;
 }
 
 export interface ScreenWallDevice {

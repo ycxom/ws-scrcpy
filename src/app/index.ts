@@ -36,9 +36,38 @@ window.onload = async function (): Promise<void> {
     StreamClientScrcpy.registerPlayer(WebCodecsPlayer);
     /// #endif
 
-    if (action === StreamClientScrcpy.ACTION && typeof parsedQuery.get('udid') === 'string') {
-        StreamClientScrcpy.start(parsedQuery);
-        return;
+    if (action === StreamClientScrcpy.ACTION) {
+        const uuid = parsedQuery.get('uuid');
+        const udid = parsedQuery.get('udid');
+        
+        if (uuid) {
+            try {
+                const apiUrl = new URL(window.location.href);
+                apiUrl.pathname = `/api/device-by-uuid/${uuid}`;
+                const response = await fetch(apiUrl.toString());
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    const { udid: deviceUdid, url: deviceUrl } = data.data;
+                    parsedQuery.set('udid', deviceUdid);
+                    if (deviceUrl) {
+                        parsedQuery.set('ws', deviceUrl);
+                    }
+                    parsedQuery.delete('uuid');
+                    StreamClientScrcpy.start(parsedQuery);
+                    return;
+                } else {
+                    console.error('Failed to get device info:', data.error);
+                    alert('无法通过UUID获取设备信息');
+                }
+            } catch (error) {
+                console.error('Error fetching device info:', error);
+                alert('获取设备信息失败');
+            }
+        } else if (udid) {
+            StreamClientScrcpy.start(parsedQuery);
+            return;
+        }
     }
 
     /// #if INCLUDE_APPL

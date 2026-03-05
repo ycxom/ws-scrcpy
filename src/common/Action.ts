@@ -14,4 +14,5 @@ export enum ACTION {
     FILE_LISTING = 'list-files',
     SCREEN_WALL = 'screen-wall',
     SCREEN_WALL_DEVICE = 'screen-wall-device',
+    GET_DEVICE_BY_UUID = 'get-device-by-uuid',
 }

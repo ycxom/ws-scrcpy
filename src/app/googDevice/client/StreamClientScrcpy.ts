@@ -137,11 +137,9 @@ export class StreamClientScrcpy
         videoSettings?: VideoSettings,
     ) {
         super(params);
-        this.useUdp = !!params.hiddenUI; // 屏幕墙模式使用 UDP
+        this.useUdp = false; // 不再使用 UDP
         if (streamReceiver) {
             this.streamReceiver = streamReceiver;
-        } else if (this.useUdp) {
-            this.streamReceiver = new UdpStreamReceiver(this.params);
         } else {
             this.streamReceiver = new StreamReceiverScrcpy(this.params);
         }
@@ -232,6 +230,7 @@ export class StreamClientScrcpy
             player: Util.parseString(params, 'player', true),
             udid: Util.parseString(params, 'udid', true),
             ws: Util.parseString(params, 'ws', true),
+            uuid: Util.parseString(params, 'uuid', false),
             hiddenUI,
             videoSettings,
         };
