@@ -16,7 +16,7 @@ interface Settings {
 }
 
 export default class VideoSettings {
-    public static readonly BASE_BUFFER_LENGTH: number = 35;
+    public static readonly BASE_BUFFER_LENGTH: number = 39;
     public readonly crop?: Rect | null = null;
     public readonly bitrate: number = 0;
     public readonly bounds?: Size | null = null;

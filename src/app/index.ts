@@ -6,6 +6,7 @@ import { Tool } from './client/Tool';
 import { ScreenWall } from './screenwall/ScreenWall';
 
 window.onload = async function (): Promise<void> {
+    
     const hash = location.hash.replace(/^#!/, '');
     const parsedQuery = new URLSearchParams(hash);
     const action = parsedQuery.get('action');

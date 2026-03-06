@@ -4,6 +4,7 @@ import { ACTION } from '../../common/Action';
 import { ScreenWallLink, ScreenWallDevice, ScreenWallMessage } from '../../types/ScreenWall';
 import { Multiplexer } from '../../packages/multiplexer/Multiplexer';
 import GoogDeviceDescriptor from '../../types/GoogDeviceDescriptor';
+import { UuidStorage } from '../UuidStorage';
 
 let ControlCenter: any;
 
@@ -23,6 +24,7 @@ export class ScreenWallService {
     private autoAddedDevices: Set<string> = new Set();
     private uuidToLinkId: Map<string, string> = new Map();
     private linkIdToUuid: Map<string, string> = new Map();
+    private uuidStorage: UuidStorage;
 
     public static readonly DEFAULT_MAX_FPS = 10;
     public static readonly DEFAULT_BITRATE = 200000;
@@ -30,8 +32,10 @@ export class ScreenWallService {
     public static readonly MIN_BITRATE = 100000;
 
     private constructor() {
+        this.uuidStorage = UuidStorage.getInstance();
         this.clearAllLinks();
         this.initAutoDiscovery();
+        this.loadSavedUuids();
     }
 
     private clearAllLinks(): void {
@@ -249,12 +253,22 @@ export class ScreenWallService {
         });
     }
 
+    private loadSavedUuids(): void {
+        const savedData = this.uuidStorage.getAll();
+        for (const [uuid, stored] of Object.entries(savedData)) {
+            this.uuidToLinkId.set(uuid, stored.linkId);
+            this.linkIdToUuid.set(stored.linkId, uuid);
+        }
+        console.log(`[ScreenWallService] Loaded ${Object.keys(savedData).length} saved UUID mappings`);
+    }
+
     public getOrCreateUuid(linkId: string): string {
         let uuid = this.linkIdToUuid.get(linkId);
         if (!uuid) {
             uuid = this.generateUuid();
             this.linkIdToUuid.set(linkId, uuid);
             this.uuidToLinkId.set(uuid, linkId);
+            this.uuidStorage.set(uuid, linkId);
         }
         return uuid;
     }
@@ -262,7 +276,21 @@ export class ScreenWallService {
     public getLinkByUuid(uuid: string): ScreenWallLink | undefined {
         const linkId = this.uuidToLinkId.get(uuid);
         if (linkId) {
-            return this.links.get(linkId);
+            const link = this.links.get(linkId);
+            if (link) {
+                this.uuidStorage.get(uuid);
+            }
+            return link;
+        }
+        
+        const storedLinkId = this.uuidStorage.get(uuid);
+        if (storedLinkId) {
+            const link = this.links.get(storedLinkId);
+            if (link) {
+                this.uuidToLinkId.set(uuid, storedLinkId);
+                this.linkIdToUuid.set(storedLinkId, uuid);
+            }
+            return link;
         }
         return undefined;
     }
@@ -272,7 +300,9 @@ export class ScreenWallService {
         if (uuid) {
             this.linkIdToUuid.delete(linkId);
             this.uuidToLinkId.delete(uuid);
+            this.uuidStorage.remove(uuid);
         }
+        this.uuidStorage.removeByLinkId(linkId);
     }
 }
 

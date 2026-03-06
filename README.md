@@ -35,8 +35,10 @@ cd ws-scrcpy
 # git tag -l
 # git checkout vX.Y.Z
 
-npm install
-npm start
+pnpm install
+pnpm run dist
+cd dist
+pnpm start
 ```
 
 ## Supported features

@@ -215,10 +215,10 @@ export class StreamClientScrcpy
         if (bitrate || maxFps || maxSize) {
             // 从 URL 参数创建设置，不从 localStorage 加载
             videoSettings = new VideoSettings({
-                bitrate: bitrate || 524288,
-                maxFps: maxFps || 24,
+                bitrate: bitrate || 8000000,
+                maxFps: maxFps || 30,
                 bounds: maxSize ? new Size(maxSize, maxSize) : new Size(1920, 1920),
-                iFrameInterval: iFrameInterval || 5,
+                iFrameInterval: iFrameInterval || 10,
                 sendFrameMeta: Util.parseBoolean(params, 'sendFrameMeta', false),
                 lockedVideoOrientation: -1,
             });

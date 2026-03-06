@@ -14,9 +14,9 @@ export class BroadwayPlayer extends BaseCanvasBasedPlayer {
     public static readonly playerCodeName = 'broadway';
     public static readonly preferredVideoSettings: VideoSettings = new VideoSettings({
         lockedVideoOrientation: -1,
-        bitrate: 524288,
-        maxFps: 24,
-        iFrameInterval: 5,
+        bitrate: 4000000,
+        maxFps: 30,
+        iFrameInterval: 10,
         bounds: new Size(1920, 1920),
         sendFrameMeta: false,
     });

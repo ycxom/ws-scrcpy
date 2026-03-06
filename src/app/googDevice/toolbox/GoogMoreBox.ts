@@ -16,10 +16,25 @@ export class GoogMoreBox {
     private readonly holder: HTMLElement;
     private readonly input: HTMLTextAreaElement;
     private readonly bitrateInput?: HTMLInputElement;
+    private readonly bitrateUnitSelect?: HTMLSelectElement;
     private readonly maxFpsInput?: HTMLInputElement;
     private readonly iFrameIntervalInput?: HTMLInputElement;
     private readonly maxWidthInput?: HTMLInputElement;
     private readonly maxHeightInput?: HTMLInputElement;
+
+    private static readonly BITRATE_UNITS = [
+        { label: 'Mbps', value: 1000000 },
+        { label: 'Kbps', value: 1000 },
+        { label: 'bps', value: 1 },
+    ];
+
+    private static convertBitrateToDisplay(bitrate: number, unit: number): number {
+        return Math.round(bitrate / unit);
+    }
+
+    private static convertBitrateFromDisplay(value: number, unit: number): number {
+        return value * unit;
+    }
 
     constructor(udid: string, private player: BasePlayer, private client: StreamClientScrcpy) {
         const playerName = player.getName();
@@ -74,10 +89,30 @@ export class GoogMoreBox {
                 const bitrateLabel = document.createElement('label');
                 bitrateLabel.innerText = '码率:';
                 bitrateInput = document.createElement('input');
-                bitrateInput.placeholder = `${preferredSettings.bitrate} bps`;
-                bitrateInput.value = videoSettings.bitrate.toString();
-                GoogMoreBox.wrap('div', [bitrateLabel, bitrateInput], innerDiv);
+                const DEFAULT_UNIT = 1000000;
+                const bitrateInMbps = GoogMoreBox.convertBitrateToDisplay(videoSettings.bitrate, DEFAULT_UNIT);
+                bitrateInput.placeholder = `${GoogMoreBox.convertBitrateToDisplay(preferredSettings.bitrate, DEFAULT_UNIT)}`;
+                bitrateInput.value = bitrateInMbps.toString();
+                
+                const bitrateUnitSelect = document.createElement('select');
+                GoogMoreBox.BITRATE_UNITS.forEach((unit) => {
+                    const option = document.createElement('option');
+                    option.value = unit.value.toString();
+                    option.text = unit.label;
+                    if (unit.value === DEFAULT_UNIT) {
+                        option.selected = true;
+                    }
+                    bitrateUnitSelect.appendChild(option);
+                });
+                
+                const bitrateWrapper = document.createElement('div');
+                bitrateWrapper.style.display = 'flex';
+                bitrateWrapper.style.gap = '5px';
+                bitrateWrapper.appendChild(bitrateInput);
+                bitrateWrapper.appendChild(bitrateUnitSelect);
+                GoogMoreBox.wrap('div', [bitrateLabel, bitrateWrapper], innerDiv);
                 this.bitrateInput = bitrateInput;
+                this.bitrateUnitSelect = bitrateUnitSelect;
 
                 const maxFpsLabel = document.createElement('label');
                 maxFpsLabel.innerText = '最大帧率:';
@@ -138,7 +173,9 @@ export class GoogMoreBox {
             btn.innerText = command;
             if (action === ControlMessage.TYPE_CHANGE_STREAM_PARAMETERS) {
                 btn.onclick = () => {
-                    const bitrate = parseInt(bitrateInput.value, 10);
+                    const bitrateValue = parseInt(bitrateInput.value, 10);
+                    const unitValue = parseInt(this.bitrateUnitSelect!.value, 10);
+                    const bitrate = isNaN(bitrateValue) ? 0 : GoogMoreBox.convertBitrateFromDisplay(bitrateValue, unitValue);
                     const maxFps = parseInt(maxFpsInput.value, 10);
                     const iFrameInterval = parseInt(iFrameIntervalInput.value, 10);
                     if (isNaN(bitrate) || isNaN(maxFps)) {
@@ -149,6 +186,7 @@ export class GoogMoreBox {
                     const bounds = new Size(width, height);
                     const current = player.getVideoSettings();
                     const { lockedVideoOrientation, sendFrameMeta, displayId, codecOptions, encoderName } = current;
+
                     const videoSettings = new VideoSettings({
                         bounds,
                         bitrate,
@@ -246,8 +284,9 @@ export class GoogMoreBox {
     };
 
     private onVideoSettings = (videoSettings: VideoSettings): void => {
-        if (this.bitrateInput) {
-            this.bitrateInput.value = videoSettings.bitrate.toString();
+        if (this.bitrateInput && this.bitrateUnitSelect) {
+            const unitValue = parseInt(this.bitrateUnitSelect.value, 10);
+            this.bitrateInput.value = GoogMoreBox.convertBitrateToDisplay(videoSettings.bitrate, unitValue).toString();
         }
         if (this.maxFpsInput) {
             this.maxFpsInput.value = videoSettings.maxFps.toString();
