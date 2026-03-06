@@ -220,7 +220,7 @@ export class ScreenWall extends ScreenWallBase {
 
     private adjustGridLayout(grid: HTMLElement, deviceCount: number): void {
         if (this.gridColumns > 0) {
-            grid.style.gridTemplateColumns = `repeat(${this.gridColumns}, 1fr)`;
+            grid.style.gridTemplateColumns = `repeat(${this.gridColumns}, minmax(300px, 1fr))`;
             grid.classList.remove('dynamic-layout');
             grid.classList.add('custom-layout');
         } else {
@@ -240,7 +240,7 @@ export class ScreenWall extends ScreenWallBase {
                 columns = 4;
             }
 
-            grid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+            grid.style.gridTemplateColumns = `repeat(${columns}, minmax(300px, 1fr))`;
             grid.classList.add('dynamic-layout');
             grid.classList.remove('custom-layout');
         }

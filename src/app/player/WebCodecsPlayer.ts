@@ -74,7 +74,6 @@ export class WebCodecsPlayer extends BaseCanvasBasedPlayer {
     private hadIDR = false;
     private bufferedSPS = false;
     private bufferedPPS = false;
-    private resizeObserver?: ResizeObserver;
 
     constructor(udid: string, displayInfo?: DisplayInfo, name = WebCodecsPlayer.playerFullName) {
         super(udid, displayInfo, name, WebCodecsPlayer.storageKeyPrefix);
@@ -122,28 +121,6 @@ export class WebCodecsPlayer extends BaseCanvasBasedPlayer {
         requestAnimationFrame(() => {
             this.applyScaling();
         });
-    }
-
-    private applyScaling(): void {
-        if (!this.parentElement) {
-            return;
-        }
-        const containerWidth = this.parentElement.clientWidth;
-        const containerHeight = this.parentElement.clientHeight;
-        const videoWidth = this.tag.width;
-        const videoHeight = this.tag.height;
-
-        if (videoWidth === 0 || videoHeight === 0 || containerWidth === 0 || containerHeight === 0) {
-            return;
-        }
-
-        // 确保完整显示视频，不裁剪，适用于屏幕墙模式和控制模式
-        const scaleX = containerWidth / videoWidth;
-        const scaleY = containerHeight / videoHeight;
-        const scale = Math.min(scaleX, scaleY);
-
-        this.tag.style.transform = `translate(-50%, -50%) scale(${scale})`;
-        this.touchableCanvas.style.transform = `translate(-50%, -50%) scale(${scale})`;
     }
 
     protected decode(data: Uint8Array): void {
@@ -234,26 +211,12 @@ export class WebCodecsPlayer extends BaseCanvasBasedPlayer {
 
     public setParent(parent: HTMLElement): void {
         super.setParent(parent);
-        
-        if (this.resizeObserver) {
-            this.resizeObserver.disconnect();
-        }
-        
-        this.resizeObserver = new ResizeObserver(() => {
-            this.applyScaling();
-        });
-        
-        this.resizeObserver.observe(parent);
     }
 
     public stop(): void {
         super.stop();
         if (this.decoder.state === 'configured') {
             this.decoder.close();
-        }
-        if (this.resizeObserver) {
-            this.resizeObserver.disconnect();
-            this.resizeObserver = undefined;
         }
     }
 }

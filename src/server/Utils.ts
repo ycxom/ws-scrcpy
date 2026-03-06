@@ -13,8 +13,6 @@ export class Utils {
                 ipv6List.push(`${proto}://[${ip}]:${port}${pathname}`);
             } else {
                 return;
-                // skip
-                // ipv6List.push(`${proto}://[${ip}%${scopeid}]:${port}`);
             }
         };
         Object.keys(os.networkInterfaces())
@@ -43,5 +41,19 @@ export class Utils {
         if (ipv6List.length) {
             console.log('\t' + ipv6List.join(' '));
         }
+    }
+
+    public static getFirstIpv4Address(): string {
+        const interfaces = os.networkInterfaces();
+        for (const name of Object.keys(interfaces)) {
+            const netInterface = interfaces[name];
+            if (!netInterface) continue;
+            for (const info of netInterface) {
+                if (info.family === 'IPv4' && !info.internal) {
+                    return info.address;
+                }
+            }
+        }
+        return 'localhost';
     }
 }

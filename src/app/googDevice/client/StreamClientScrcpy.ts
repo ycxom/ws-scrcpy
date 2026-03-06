@@ -80,12 +80,25 @@ export class StreamClientScrcpy
                 playerClass = value;
             }
         }
+        if (!playerClass) {
+            const availablePlayers = this.getPlayers();
+            console.warn(`[StreamClientScrcpy] Player "${playerName}" not found. Available players:`, availablePlayers.map(p => p.playerFullName));
+            if (availablePlayers.length > 0) {
+                const fallback = availablePlayers[0];
+                console.warn(`[StreamClientScrcpy] Using fallback player: ${fallback.playerFullName}`);
+                return fallback;
+            }
+            console.error(`[StreamClientScrcpy] No available players found!`);
+        }
+        console.log(`[StreamClientScrcpy] Returning player class:`, playerClass?.playerFullName);
         return playerClass;
     }
 
     public static createPlayer(playerName: string, udid: string, displayInfo?: DisplayInfo): BasePlayer | undefined {
         const playerClass = this.getPlayerClass(playerName);
+        console.log(`[StreamClientScrcpy] createPlayer: playerName=${playerName}, playerClass=${playerClass?.playerFullName}`);
         if (!playerClass) {
+            console.error(`[StreamClientScrcpy] createPlayer failed: no player class for "${playerName}"`);
             return;
         }
         return new playerClass(udid, displayInfo);
@@ -354,8 +367,9 @@ export class StreamClientScrcpy
             if (!p) {
                 throw Error(`Unsupported player: "${playerName}"`);
             }
+            const actualPlayerName = p.getName();
             if (typeof fitToScreen !== 'boolean') {
-                fitToScreen = StreamClientScrcpy.getFitToScreen(playerName, udid, displayInfo);
+                fitToScreen = StreamClientScrcpy.getFitToScreen(actualPlayerName, udid, displayInfo);
             }
             player = p;
         }

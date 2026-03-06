@@ -176,6 +176,10 @@ export abstract class BaseCanvasBasedPlayer extends BasePlayer {
         };
         this.tag.width = Math.round(width);
         this.tag.height = Math.round(height);
+        
+        requestAnimationFrame(() => {
+            this.applyScaling();
+        });
     }
 
     public play(): void {

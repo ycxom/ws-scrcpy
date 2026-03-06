@@ -17,14 +17,14 @@ window.onload = async function (): Promise<void> {
         return;
     }
 
-    /// #if USE_BROADWAY
-    const { BroadwayPlayer } = await import('./player/BroadwayPlayer');
-    StreamClientScrcpy.registerPlayer(BroadwayPlayer);
-    /// #endif
-
     /// #if USE_H264_CONVERTER
     const { MsePlayer } = await import('./player/MsePlayer');
     StreamClientScrcpy.registerPlayer(MsePlayer);
+    /// #endif
+
+    /// #if USE_BROADWAY
+    const { BroadwayPlayer } = await import('./player/BroadwayPlayer');
+    StreamClientScrcpy.registerPlayer(BroadwayPlayer);
     /// #endif
 
     /// #if USE_TINY_H264

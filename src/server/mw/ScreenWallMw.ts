@@ -5,6 +5,7 @@ import { ScreenWallLink, ScreenWallDevice, ScreenWallMessage } from '../../types
 import { Multiplexer } from '../../packages/multiplexer/Multiplexer';
 import GoogDeviceDescriptor from '../../types/GoogDeviceDescriptor';
 import { UuidStorage } from '../UuidStorage';
+import { Utils } from '../Utils';
 
 let ControlCenter: any;
 
@@ -78,7 +79,8 @@ export class ScreenWallService {
             let deviceUrl = '';
 
             if (device.pid !== -1) {
-                const proxyUrl = new URL('http://localhost:3003');
+                const serverIp = Utils.getFirstIpv4Address();
+                const proxyUrl = new URL(`http://${serverIp}:3003`);
                 proxyUrl.pathname = '/';
                 proxyUrl.searchParams.set('action', 'proxy-adb');
                 proxyUrl.searchParams.set('remote', 'tcp:8886');
@@ -336,7 +338,8 @@ export class ScreenWallProxy extends Mw {
                 wsProxyUrl.protocol = wsProxyUrl.protocol === 'https:' ? 'wss:' : 'ws:';
                 wsUrl = wsProxyUrl.toString();
             } else if (this.link.useProxy) {
-                const proxyUrl = new URL('http://localhost:3003');
+                const serverIp = Utils.getFirstIpv4Address();
+                const proxyUrl = new URL(`http://${serverIp}:3003`);
                 proxyUrl.pathname = '/';
                 proxyUrl.search = '';
                 proxyUrl.hash = '';

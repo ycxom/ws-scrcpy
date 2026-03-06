@@ -63,6 +63,7 @@ export abstract class BasePlayer extends TypedEmitter<PlayerEvents> {
     protected videoSettings: VideoSettings;
     protected parentElement?: HTMLElement;
     protected touchableCanvas: HTMLCanvasElement;
+    protected resizeObserver?: ResizeObserver;
     protected inputBytes: BitrateStat[] = [];
     protected perSecondQualityStats?: FramesPerSecondStats;
     protected momentumQualityStats?: PlaybackQuality;
@@ -317,6 +318,10 @@ export abstract class BasePlayer extends TypedEmitter<PlayerEvents> {
 
     public stop(): void {
         this.state = BasePlayer.STATE.STOPPED;
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = undefined;
+        }
     }
 
     public getState(): number {
@@ -347,6 +352,41 @@ export abstract class BasePlayer extends TypedEmitter<PlayerEvents> {
         this.parentElement = parent;
         parent.appendChild(this.tag);
         parent.appendChild(this.touchableCanvas);
+        
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+        }
+        
+        this.resizeObserver = new ResizeObserver(() => {
+            this.applyScaling();
+        });
+        
+        this.resizeObserver.observe(parent);
+        
+        requestAnimationFrame(() => {
+            this.applyScaling();
+        });
+    }
+
+    protected applyScaling(): void {
+        if (!this.parentElement) {
+            return;
+        }
+        const containerWidth = this.parentElement.clientWidth;
+        const containerHeight = this.parentElement.clientHeight;
+        const videoWidth = this.tag.clientWidth;
+        const videoHeight = this.tag.clientHeight;
+
+        if (videoWidth === 0 || videoHeight === 0 || containerWidth === 0 || containerHeight === 0) {
+            return;
+        }
+
+        const scaleX = containerWidth / videoWidth;
+        const scaleY = containerHeight / videoHeight;
+        const scale = Math.min(scaleX, scaleY);
+
+        this.tag.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        this.touchableCanvas.style.transform = `translate(-50%, -50%) scale(${scale})`;
     }
 
     protected needScreenInfoBeforePlay(): boolean {
