@@ -6,6 +6,8 @@ import { Multiplexer } from '../../packages/multiplexer/Multiplexer';
 import GoogDeviceDescriptor from '../../types/GoogDeviceDescriptor';
 import { UuidStorage } from '../UuidStorage';
 import { Utils } from '../Utils';
+import * as crypto from 'crypto';
+import * as os from 'os';
 
 let ControlCenter: any;
 
@@ -14,6 +16,14 @@ try {
     ControlCenter = controlCenterModule.ControlCenter;
 } catch (e) {
     console.error('[ScreenWallMw] Failed to import ControlCenter:', e);
+}
+
+interface DeviceInfo {
+    udid: string;
+    mac: string | undefined;
+    model: string;
+    isWired: boolean;
+    linkId: string;
 }
 
 export class ScreenWallService {
@@ -26,6 +36,7 @@ export class ScreenWallService {
     private uuidToLinkId: Map<string, string> = new Map();
     private linkIdToUuid: Map<string, string> = new Map();
     private uuidStorage: UuidStorage;
+    private deviceUniqueIdMap: Map<string, DeviceInfo> = new Map();
 
     public static readonly DEFAULT_MAX_FPS = 10;
     public static readonly DEFAULT_BITRATE = 200000;
@@ -39,6 +50,18 @@ export class ScreenWallService {
         this.loadSavedUuids();
     }
 
+    private generateUniqueDeviceId(mac: string | undefined, model: string): string {
+        const hostname = os.hostname();
+        const macPart = mac || '';
+        // 使用 MAC + 型号 + 主机名作为唯一标识
+        const input = [macPart, model, hostname].join('|');
+        return crypto.createHash('md5').update(input).digest('hex');
+    }
+
+    private isWiredConnection(udid: string): boolean {
+        return !udid.match(/^\d+\.\d+\.\d+\.\d+:/) || udid.startsWith('emulator-');
+    }
+
     private clearAllLinks(): void {
         for (const linkId of Array.from(this.links.keys())) {
             if (linkId.startsWith('auto_')) {
@@ -46,6 +69,7 @@ export class ScreenWallService {
             }
         }
         this.autoAddedDevices.clear();
+        this.deviceUniqueIdMap.clear();
         console.log('[ScreenWallMw] Cleared all auto-added links');
     }
 
@@ -72,9 +96,37 @@ export class ScreenWallService {
 
     private handleDeviceUpdate(device: any): void {
         const udid = device.udid;
-        const linkId = `auto_${udid}`;
+        const mac = device.macAddress;
+        const model = device['ro.product.model'] || '';
+        const isWired = this.isWiredConnection(udid);
+        
+        // 使用 MAC + 型号生成唯一ID（MAC是同一设备的最可靠标识）
+        const uniqueId = this.generateUniqueDeviceId(mac, model);
+        
+        console.log(`[ScreenWallMw] Processing device: ${udid}, model=${model}, mac=${mac || 'N/A'}, uniqueId=${uniqueId}`);
+        console.log(`[ScreenWallMw] Current deviceUniqueIdMap size: ${this.deviceUniqueIdMap.size}`);
         
         if (device.state === 'device') {
+            const existingInfo = this.deviceUniqueIdMap.get(uniqueId);
+            
+            if (existingInfo) {
+                console.log(`[ScreenWallMw] Found existing device: ${existingInfo.udid}, isWired=${existingInfo.isWired}`);
+                if (isWired) {
+                    console.log(`[ScreenWallMw] Wired device found for ${uniqueId}: ${udid}, replacing wireless`);
+                    this.removeLink(existingInfo.linkId);
+                    this.deviceUniqueIdMap.delete(uniqueId);
+                } else if (existingInfo.isWired) {
+                    console.log(`[ScreenWallMw] Wireless duplicate ignored, keeping wired: ${existingInfo.udid}`);
+                    return;
+                } else {
+                    console.log(`[ScreenWallMw] Updating existing device: ${existingInfo.udid} -> ${udid}`);
+                    this.removeLink(existingInfo.linkId);
+                    this.deviceUniqueIdMap.delete(uniqueId);
+                }
+            } else {
+                console.log(`[ScreenWallMw] No existing device found for uniqueId: ${uniqueId}`);
+            }
+            
             let deviceName = device['ro.product.model'] || device.udid;
             let deviceUrl = '';
 
@@ -89,6 +141,7 @@ export class ScreenWallService {
                 deviceUrl = proxyUrl.toString();
             }
 
+            const linkId = `auto_${udid}`;
             const link: ScreenWallLink = {
                 id: linkId,
                 name: deviceName,
@@ -99,19 +152,23 @@ export class ScreenWallService {
                 udid: udid,
             };
 
-            if (this.autoAddedDevices.has(udid)) {
-                this.removeLink(linkId);
-                this.addLink(link);
-                console.log(`[ScreenWallMw] Auto-updated device: ${deviceName} (${udid})`);
-            } else {
-                this.autoAddedDevices.add(udid);
-                this.addLink(link);
-                console.log(`[ScreenWallMw] Auto-added device: ${deviceName} (${udid})`);
-            }
+            this.deviceUniqueIdMap.set(uniqueId, {
+                udid,
+                mac,
+                model,
+                isWired,
+                linkId,
+            });
+            
+            this.autoAddedDevices.add(udid);
+            this.addLink(link);
+            console.log(`[ScreenWallMw] Auto-added device: ${deviceName} (${udid}, wired=${isWired}, mac=${mac || 'N/A'})`);
         } else {
-            if (this.autoAddedDevices.has(udid)) {
+            const existingInfo = this.deviceUniqueIdMap.get(uniqueId);
+            if (existingInfo && this.autoAddedDevices.has(udid)) {
                 this.autoAddedDevices.delete(udid);
-                this.removeLink(linkId);
+                this.deviceUniqueIdMap.delete(uniqueId);
+                this.removeLink(`auto_${udid}`);
                 console.log(`[ScreenWallMw] Auto-removed device: ${device['ro.product.model'] || udid} (${udid})`);
             }
         }

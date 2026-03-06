@@ -51,6 +51,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
             'ro.product.manufacturer': '',
             'ro.product.model': '',
             'ro.product.cpu.abi': '',
+            'ro.serialno': '',
             'last.update.timestamp': 0,
         };
         this.client = AdbExtended.createClient();
@@ -330,6 +331,13 @@ export class Device extends TypedEmitter<DeviceEvents> {
             const netIntPromise = this.updateInterfaces().then((interfaces) => {
                 return !!interfaces.length;
             });
+            const macPromise = this.getMacAddress().then((mac) => {
+                if (mac && mac !== this.descriptor.macAddress) {
+                    this.descriptor.macAddress = mac;
+                    this.emitUpdate();
+                }
+                return !!mac;
+            });
             let pidPromise: Promise<number | undefined>;
             if (this.spawnServer) {
                 pidPromise = this.startServer();
@@ -339,7 +347,7 @@ export class Device extends TypedEmitter<DeviceEvents> {
             const serverPromise = pidPromise.then(() => {
                 return !(this.descriptor.pid === -1 && this.spawnServer);
             });
-            Promise.all([propsPromise, netIntPromise, serverPromise])
+            Promise.all([propsPromise, netIntPromise, macPromise, serverPromise])
                 .then((results) => {
                     this.updateTimeoutId = undefined;
                     const failedCount = results.filter((result) => !result).length;
@@ -399,6 +407,55 @@ export class Device extends TypedEmitter<DeviceEvents> {
             return pid;
         } else {
             return;
+        }
+    }
+
+    public async getMacAddress(): Promise<string | undefined> {
+        if (!this.connected) {
+            return undefined;
+        }
+        try {
+            const output = await this.runShellCommandAdbKit('cat /sys/class/net/wlan0/address');
+            const mac = output.trim().toUpperCase();
+            if (/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(mac)) {
+                return mac;
+            }
+            return undefined;
+        } catch (e) {
+            return undefined;
+        }
+    }
+
+    public async getSerialNumber(): Promise<string | undefined> {
+        if (!this.connected) {
+            return undefined;
+        }
+        try {
+            // 尝试多种方式获取序列号
+            // 1. 首先尝试 ro.serialno
+            let output = await this.runShellCommandAdbKit('getprop ro.serialno');
+            let serial = output.trim();
+            if (serial && serial !== 'unknown' && serial !== 'null') {
+                return serial;
+            }
+            
+            // 2. 尝试 ro.boot.serialno
+            output = await this.runShellCommandAdbKit('getprop ro.boot.serialno');
+            serial = output.trim();
+            if (serial && serial !== 'unknown' && serial !== 'null') {
+                return serial;
+            }
+            
+            // 3. 尝试从 /proc/cpuinfo 获取硬件序列号
+            output = await this.runShellCommandAdbKit('cat /proc/cpuinfo | grep Serial | awk \'{print $3}\'');
+            serial = output.trim();
+            if (serial && serial.length > 5) {
+                return serial;
+            }
+            
+            return undefined;
+        } catch (e) {
+            return undefined;
         }
     }
 
