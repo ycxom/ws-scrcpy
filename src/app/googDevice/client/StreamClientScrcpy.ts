@@ -60,6 +60,7 @@ export class StreamClientScrcpy
     private player?: BasePlayer;
     private filePushHandler?: FilePushHandler;
     private fitToScreen?: boolean;
+    private streamStarted = false;
     private readonly streamReceiver: StreamReceiverScrcpy | UdpStreamReceiver;
     private readonly useUdp: boolean;
 
@@ -350,6 +351,12 @@ export class StreamClientScrcpy
     };
 
     public startStream({ udid, player, playerName, videoSettings, fitToScreen }: StartParams): void {
+        if (this.streamStarted) {
+            console.log(TAG, 'Stream already started, skipping duplicate startStream call');
+            return;
+        }
+        this.streamStarted = true;
+
         if (!udid) {
             throw Error(`Invalid udid value: "${udid}"`);
         }

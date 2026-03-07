@@ -215,30 +215,22 @@ export class GoogMoreBox {
         }
         GoogMoreBox.wrap('p', commands, moreBox);
 
-        const screenPowerModeId = `screen_power_mode_${udid}_${playerName}_${displayId}`;
-        const screenPowerModeLabel = document.createElement('label');
-        screenPowerModeLabel.style.display = 'none';
-        const labelTextPrefix = '模式';
-        const buttonTextPrefix = '设置屏幕电源模式';
-        const screenPowerModeCheck = document.createElement('input');
-        screenPowerModeCheck.type = 'checkbox';
-        let mode = (screenPowerModeCheck.checked = false) ? 'ON' : 'OFF';
-        screenPowerModeCheck.id = screenPowerModeLabel.htmlFor = screenPowerModeId;
-        screenPowerModeLabel.innerText = `${labelTextPrefix} ${mode}`;
-        screenPowerModeCheck.onchange = () => {
-            mode = screenPowerModeCheck.checked ? 'ON' : 'OFF';
-            screenPowerModeLabel.innerText = `${labelTextPrefix} ${mode}`;
-            sendScreenPowerModeButton.innerText = `${buttonTextPrefix} ${mode}`;
-        };
-        const sendScreenPowerModeButton = document.createElement('button');
-        sendScreenPowerModeButton.innerText = `${buttonTextPrefix} ${mode}`;
-        sendScreenPowerModeButton.onclick = () => {
-            const message = CommandControlMessage.createSetScreenPowerModeCommand(screenPowerModeCheck.checked);
+        // 屏幕电源控制按钮 - 直接显示两个独立按钮
+        const screenOffButton = document.createElement('button');
+        screenOffButton.innerText = '熄灭屏幕';
+        screenOffButton.onclick = () => {
+            const message = CommandControlMessage.createSetScreenPowerModeCommand(false);
             client.sendMessage(message);
         };
-        GoogMoreBox.wrap('p', [screenPowerModeCheck, screenPowerModeLabel, sendScreenPowerModeButton], moreBox, [
-            'flex-center',
-        ]);
+
+        const screenOnButton = document.createElement('button');
+        screenOnButton.innerText = '点亮屏幕';
+        screenOnButton.onclick = () => {
+            const message = CommandControlMessage.createSetScreenPowerModeCommand(true);
+            client.sendMessage(message);
+        };
+
+        GoogMoreBox.wrap('p', [screenOffButton, screenOnButton], moreBox, ['flex-center']);
 
         const qualityId = `show_video_quality_${udid}_${playerName}_${displayId}`;
         const qualityLabel = document.createElement('label');
