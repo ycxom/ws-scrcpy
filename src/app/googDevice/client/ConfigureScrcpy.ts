@@ -478,7 +478,7 @@ export class ConfigureScrcpy extends BaseClient<ParamsStreamScrcpy, ConfigureScr
             range: { min: 1, max: 60, step: 1 },
         });
         this.appendBasicInput(controls, { label: 'I-Frame interval', id: 'iFrameInterval' });
-        
+
         const fitLabel = document.createElement('label');
         fitLabel.innerText = 'Fit to screen';
         fitLabel.classList.add('label');

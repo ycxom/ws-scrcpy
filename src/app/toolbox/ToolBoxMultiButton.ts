@@ -10,19 +10,19 @@ export class ToolBoxMultiButton extends ToolBoxElement<HTMLButtonElement> {
 
     constructor(title: string, icon: Icon, optional?: Optional) {
         super(title, optional);
-        
+
         // 创建容器
         const container = document.createElement('div');
         container.classList.add('control-button-container');
         container.style.position = 'relative';
         container.style.display = 'inline-block';
-        
+
         // 创建主按钮
         const btn = document.createElement('button');
         btn.classList.add('control-button');
         btn.title = title;
         btn.appendChild(SvgImage.create(icon));
-        
+
         // 创建右上角勾选框
         const checkboxWrapper = document.createElement('div');
         checkboxWrapper.classList.add('button-checkbox-wrapper');
@@ -38,7 +38,7 @@ export class ToolBoxMultiButton extends ToolBoxElement<HTMLButtonElement> {
             align-items: center;
             justify-content: center;
         `;
-        
+
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.classList.add('button-checkbox');
@@ -49,11 +49,11 @@ export class ToolBoxMultiButton extends ToolBoxElement<HTMLButtonElement> {
             cursor: pointer;
             accent-color: #00BEA4;
         `;
-        
+
         checkboxWrapper.appendChild(checkbox);
         container.appendChild(btn);
         container.appendChild(checkboxWrapper);
-        
+
         // 勾选框点击事件
         checkboxWrapper.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -62,7 +62,7 @@ export class ToolBoxMultiButton extends ToolBoxElement<HTMLButtonElement> {
             this.updateVisualState();
             this.onCheckChange?.(this.checked);
         });
-        
+
         // 防止勾选框自身的点击事件冒泡
         checkbox.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -70,7 +70,7 @@ export class ToolBoxMultiButton extends ToolBoxElement<HTMLButtonElement> {
             this.updateVisualState();
             this.onCheckChange?.(this.checked);
         });
-        
+
         this.btn = btn;
         this.checkbox = checkbox;
         this.container = container;

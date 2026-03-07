@@ -49,7 +49,6 @@ export class StreamClientScrcpy
     public static ACTION = 'stream';
     private static players: Map<string, PlayerClass> = new Map<string, PlayerClass>();
 
-
     private deviceName = '';
     private clientId = -1;
     private clientsCount = -1;
@@ -83,7 +82,10 @@ export class StreamClientScrcpy
         }
         if (!playerClass) {
             const availablePlayers = this.getPlayers();
-            console.warn(`[StreamClientScrcpy] Player "${playerName}" not found. Available players:`, availablePlayers.map(p => p.playerFullName));
+            console.warn(
+                `[StreamClientScrcpy] Player "${playerName}" not found. Available players:`,
+                availablePlayers.map((p) => p.playerFullName),
+            );
             if (availablePlayers.length > 0) {
                 const fallback = availablePlayers[0];
                 console.warn(`[StreamClientScrcpy] Using fallback player: ${fallback.playerFullName}`);
@@ -97,7 +99,9 @@ export class StreamClientScrcpy
 
     public static createPlayer(playerName: string, udid: string, displayInfo?: DisplayInfo): BasePlayer | undefined {
         const playerClass = this.getPlayerClass(playerName);
-        console.log(`[StreamClientScrcpy] createPlayer: playerName=${playerName}, playerClass=${playerClass?.playerFullName}`);
+        console.log(
+            `[StreamClientScrcpy] createPlayer: playerName=${playerName}, playerClass=${playerClass?.playerFullName}`,
+        );
         if (!playerClass) {
             console.error(`[StreamClientScrcpy] createPlayer failed: no player class for "${playerName}"`);
             return;
@@ -203,13 +207,11 @@ export class StreamClientScrcpy
         const { udid, player: playerName } = this.params;
         this.startStream({ udid, player, playerName, fitToScreen, videoSettings });
         this.setBodyClass('stream');
-        
+
         if (!params.hiddenUI) {
             this.fitToScreen = true;
         }
     }
-    
-
 
     public static parseParameters(params: URLSearchParams): ParamsStreamScrcpy {
         const typedParams = super.parseParameters(params);
@@ -384,7 +386,14 @@ export class StreamClientScrcpy
 
         const deviceView = document.createElement('div');
         deviceView.className = 'device-view';
-        const stop = (ev?: string | Event) => {
+
+        const isHiddenUI = !!this.params.hiddenUI;
+
+        let moreBoxInstance: GoogMoreBox | undefined;
+        let controlButtons: HTMLElement | undefined;
+        let stop: ((ev?: string | Event) => void) | undefined;
+
+        stop = (ev?: string | Event) => {
             if (ev && ev instanceof Event && ev.type === 'error') {
                 console.error(TAG, ev);
             }
@@ -393,10 +402,11 @@ export class StreamClientScrcpy
             if (parent) {
                 parent.removeChild(deviceView);
             }
-            if (moreBox) {
-                parent = moreBox.parentElement;
+            if (moreBoxInstance) {
+                const holder = moreBoxInstance.getHolderElement();
+                parent = holder.parentElement;
                 if (parent) {
-                    parent.removeChild(moreBox);
+                    parent.removeChild(holder);
                 }
             }
             // 停止 UDP 接收器（如果使用 UDP）
@@ -409,33 +419,29 @@ export class StreamClientScrcpy
             }
         };
 
-        const isHiddenUI = !!this.params.hiddenUI;
-
-        let moreBox: HTMLElement | undefined;
-        let controlButtons: HTMLElement | undefined;
         if (!isHiddenUI) {
             const googMoreBox = (this.moreBox = new GoogMoreBox(udid, player, this));
-            moreBox = googMoreBox.getHolderElement();
+            moreBoxInstance = googMoreBox;
             googMoreBox.setOnStop(stop);
-            const googToolBox = GoogToolBox.createToolBox(udid, player, this, moreBox);
+            const googToolBox = GoogToolBox.createToolBox(udid, player, this, moreBoxInstance);
             controlButtons = googToolBox.getHolderElement();
         }
 
         const video = document.createElement('div');
         video.className = 'video';
         deviceView.appendChild(video);
-        
+
         const bottomBar = document.createElement('div');
         bottomBar.className = 'bottom-bar';
-        
+
         if (controlButtons && !isHiddenUI) {
             bottomBar.appendChild(controlButtons);
         }
-        
+
         deviceView.appendChild(bottomBar);
-        
-        if (moreBox && !isHiddenUI) {
-            deviceView.appendChild(moreBox);
+
+        if (moreBoxInstance && !isHiddenUI) {
+            document.body.appendChild(moreBoxInstance.getHolderElement());
         }
 
         player.setParent(video);
@@ -451,7 +457,7 @@ export class StreamClientScrcpy
                 videoSettings = player.getVideoSettings();
             }
         }
-        
+
         if (fitToScreen) {
             const newBounds = this.getMaxSize();
             if (newBounds) {
@@ -460,7 +466,7 @@ export class StreamClientScrcpy
         }
         // 屏幕墙模式不保存设置到 localStorage
         this.applyNewVideoSettings(videoSettings, !isHiddenUI);
-        
+
         if (!isHiddenUI) {
             this.setTouchListeners(player);
             const element = player.getTouchableElement();
@@ -475,12 +481,12 @@ export class StreamClientScrcpy
         streamReceiver.on('clientsStats', this.onClientsStats);
         streamReceiver.on('displayInfo', this.onDisplayInfo);
         streamReceiver.on('disconnected', this.onDisconnected);
-        
+
         // 启动 UDP 接收器（如果使用 UDP）
         if (this.useUdp && 'startUdp' in streamReceiver) {
             streamReceiver.startUdp();
         }
-        
+
         console.log(TAG, player.getName(), udid);
     }
 

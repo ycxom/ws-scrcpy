@@ -116,7 +116,7 @@ export class WebCodecsPlayer extends BaseCanvasBasedPlayer {
 
         // FIXME: canvas was initialized from `.setScreenInfo()` call above, but with wrong values
         this.initCanvas(width, height);
-        
+
         // 延迟应用缩放，确保 parent 元素已经布局好
         requestAnimationFrame(() => {
             this.applyScaling();

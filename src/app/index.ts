@@ -6,7 +6,6 @@ import { Tool } from './client/Tool';
 import { ScreenWall } from './screenwall/ScreenWall';
 
 window.onload = async function (): Promise<void> {
-    
     const hash = location.hash.replace(/^#!/, '');
     const parsedQuery = new URLSearchParams(hash);
     const action = parsedQuery.get('action');
@@ -40,14 +39,14 @@ window.onload = async function (): Promise<void> {
     if (action === StreamClientScrcpy.ACTION) {
         const uuid = parsedQuery.get('uuid');
         const udid = parsedQuery.get('udid');
-        
+
         if (uuid) {
             try {
                 const apiUrl = new URL(window.location.href);
                 apiUrl.pathname = `/api/device-by-uuid/${uuid}`;
                 const response = await fetch(apiUrl.toString());
                 const data = await response.json();
-                
+
                 if (data.success && data.data) {
                     const { udid: deviceUdid, url: deviceUrl } = data.data;
                     parsedQuery.set('udid', deviceUdid);

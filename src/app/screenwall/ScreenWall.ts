@@ -32,8 +32,8 @@ export class ScreenWall extends ScreenWallBase {
     public static readonly ACTION = ACTION.SCREEN_WALL;
     private links: ScreenWallLink[] = [];
     private ws: WebSocket | null = null;
-    private gridColumns: number = 0;
-    private gridRows: number = 0;
+    private gridColumns = 0;
+    private gridRows = 0;
 
     constructor() {
         super({ action: ScreenWall.ACTION });
@@ -56,7 +56,7 @@ export class ScreenWall extends ScreenWallBase {
         container.id = 'screen-wall-container';
         container.innerHTML = this.getTemplate();
         document.body.appendChild(container);
-        
+
         this.loadGridConfig();
         this.bindEvents();
         this.bindGridConfigEvents();
@@ -149,9 +149,11 @@ export class ScreenWall extends ScreenWallBase {
         const bitrateKbps = Math.round((link.bitrate || 200000) / 1000);
         const fps = link.maxFps || 10;
         const streamUrl = this.buildStreamUrl(link);
-        
+
         return `
-            <div class="screen-wall-card" data-link-id="${link.id}" data-udid="${encodeURIComponent(link.udid || link.id)}" data-ws="${encodeURIComponent(link.url || '')}">
+            <div class="screen-wall-card" data-link-id="${link.id}" data-udid="${encodeURIComponent(
+            link.udid || link.id,
+        )}" data-ws="${encodeURIComponent(link.url || '')}">
                 <div class="screen-wall-card-preview">
                     <iframe src="${streamUrl}" class="card-iframe" frameborder="0" scrolling="no"></iframe>
                     <div class="card-click-overlay" title="点击进入控制模式"></div>
@@ -167,11 +169,11 @@ export class ScreenWall extends ScreenWallBase {
             </div>
         `;
     }
-    
+
     private bindEvents(): void {
         const grid = document.getElementById('screen-wall-grid');
         if (!grid) return;
-        
+
         grid.addEventListener('click', (e) => {
             console.log('[ScreenWall] Click event triggered');
             const card = (e.target as HTMLElement).closest('.screen-wall-card');
@@ -182,36 +184,38 @@ export class ScreenWall extends ScreenWallBase {
             }
         });
     }
-    
+
     private buildStreamUrl(link: ScreenWallLink): string {
         const url = new URL(window.location.href);
         // 屏幕墙使用独立的视频设置，避免与控制模式冲突
         // 默认使用较低的码率和帧率以节省带宽
         const screenWallParams = new URLSearchParams({
-            bitrate: '2000000',     // 2Mbps
-            maxFps: '15',          // 15fps
-            maxSize: '1920',       // 最大1080p
+            bitrate: '2000000', // 2Mbps
+            maxFps: '15', // 15fps
+            maxSize: '1920', // 最大1080p
             iFrameInterval: '5',
             sendFrameMeta: 'false',
         });
-        
+
         const uuid = link.uuid || link.id;
-        
-        url.hash = `#!action=stream&uuid=${encodeURIComponent(uuid)}&player=webcodecs&hiddenUI=true&${screenWallParams.toString()}`;
-        
+
+        url.hash = `#!action=stream&uuid=${encodeURIComponent(
+            uuid,
+        )}&player=webcodecs&hiddenUI=true&${screenWallParams.toString()}`;
+
         return url.toString();
     }
 
     private navigateToControl(linkId: string): void {
         // 从 this.links 中找到对应的 link
-        const link = this.links.find(l => l.id === linkId);
+        const link = this.links.find((l) => l.id === linkId);
         if (!link) {
             console.error('[ScreenWall] Link not found:', linkId);
             return;
         }
-        
+
         const uuid = link.uuid || link.id;
-        
+
         const hash = `#!action=stream&uuid=${encodeURIComponent(uuid)}&player=webcodecs`;
         console.log('[ScreenWall] Setting hash:', hash);
         window.location.hash = hash;
@@ -225,7 +229,7 @@ export class ScreenWall extends ScreenWallBase {
             grid.classList.add('custom-layout');
         } else {
             let columns: number;
-            
+
             if (deviceCount === 1) {
                 columns = 1;
             } else if (deviceCount === 2) {
@@ -253,7 +257,7 @@ export class ScreenWall extends ScreenWallBase {
         try {
             const savedColumns = localStorage.getItem('screen-wall-columns');
             const savedRows = localStorage.getItem('screen-wall-rows');
-            
+
             if (savedColumns) {
                 this.gridColumns = parseInt(savedColumns, 10);
                 const columnsInput = document.getElementById('grid-columns') as HTMLInputElement;
@@ -261,7 +265,7 @@ export class ScreenWall extends ScreenWallBase {
                     columnsInput.value = this.gridColumns.toString();
                 }
             }
-            
+
             if (savedRows) {
                 this.gridRows = parseInt(savedRows, 10);
                 const rowsInput = document.getElementById('grid-rows') as HTMLInputElement;
@@ -281,7 +285,7 @@ export class ScreenWall extends ScreenWallBase {
             } else {
                 localStorage.removeItem('screen-wall-columns');
             }
-            
+
             if (this.gridRows > 0) {
                 localStorage.setItem('screen-wall-rows', this.gridRows.toString());
             } else {
@@ -298,12 +302,12 @@ export class ScreenWall extends ScreenWallBase {
             applyButton.addEventListener('click', () => {
                 const columnsInput = document.getElementById('grid-columns') as HTMLInputElement;
                 const rowsInput = document.getElementById('grid-rows') as HTMLInputElement;
-                
+
                 this.gridColumns = columnsInput ? parseInt(columnsInput.value, 10) || 0 : 0;
                 this.gridRows = rowsInput ? parseInt(rowsInput.value, 10) || 0 : 0;
-                
+
                 this.saveGridConfig();
-                
+
                 if (this.links.length > 0) {
                     const grid = document.getElementById('screen-wall-grid');
                     if (grid) {

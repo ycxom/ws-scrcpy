@@ -211,20 +211,20 @@ export abstract class InteractionHandler {
         const { width, height } = screenInfo.videoSize;
         const target: HTMLElement = event.target as HTMLElement;
         const rect = target.getBoundingClientRect();
-        
+
         // 计算缩放比例
         const containerWidth = rect.width;
         const containerHeight = rect.height;
-        
+
         // 计算视频的实际显示区域（考虑宽高比）
         let realWidth = containerWidth;
         let realHeight = containerHeight;
         let offsetX = 0;
         let offsetY = 0;
-        
+
         const ratio = width / height;
         const containerRatio = containerWidth / containerHeight;
-        
+
         if (ratio > containerRatio) {
             // 视频更宽，高度自适应
             realHeight = containerWidth / ratio;
@@ -234,25 +234,25 @@ export abstract class InteractionHandler {
             realWidth = containerHeight * ratio;
             offsetX = (containerWidth - realWidth) / 2;
         }
-        
+
         // 计算触摸坐标（相对于实际视频区域）
-        let touchX = event.clientX - rect.left - offsetX;
-        let touchY = event.clientY - rect.top - offsetY;
-        
+        const touchX = event.clientX - rect.left - offsetX;
+        const touchY = event.clientY - rect.top - offsetY;
+
         // 验证触摸坐标是否在视频区域内
         let invalid = false;
         if (touchX < 0 || touchX > realWidth || touchY < 0 || touchY > realHeight) {
             invalid = true;
         }
-        
+
         // 计算最终的视频坐标
         const x = (touchX * width) / realWidth;
         const y = (touchY * height) / realHeight;
-        
+
         const size = new Size(width, height);
         const point = new Point(x, y);
         const position = new Position(point, size);
-        
+
         if (x < 0 || y < 0 || x > width || y > height) {
             invalid = true;
         }

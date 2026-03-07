@@ -11,7 +11,7 @@ interface UdpClient {
 export class UdpServer implements Service {
     private static instance?: UdpServer;
     private server?: dgram.Socket;
-    private port: number = 8888;
+    private port = 8888;
     private clients: Map<string, UdpClient> = new Map();
     private mwFactories: Set<MwFactory> = new Set();
     private cleanupInterval?: NodeJS.Timeout;
@@ -40,7 +40,7 @@ export class UdpServer implements Service {
         this.clients.set(clientKey, {
             address,
             port,
-            lastSeen: Date.now()
+            lastSeen: Date.now(),
         });
         console.log(`[UdpServer] Client connected: ${clientKey}, total: ${this.clients.size}`);
     }

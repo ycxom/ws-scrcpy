@@ -78,12 +78,12 @@ export class HttpServer extends TypedEmitter<HttpServerEvents> implements Servic
 
     public async start(): Promise<void> {
         this.mainApp = express();
-        
+
         // HLS 流媒体路由
         this.mainApp.get('/hls/:udid/stream.m3u8', (req, res) => {
             const udid = req.params.udid;
             console.log(`[HttpServer] Requesting HLS playlist for: ${udid}`);
-            
+
             const m3u8 = HlsStreamService.getInstance().getStreamM3u8(udid);
             if (m3u8) {
                 res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
@@ -93,14 +93,14 @@ export class HttpServer extends TypedEmitter<HttpServerEvents> implements Servic
                 res.status(404).send('Stream not found');
             }
         });
-        
+
         this.mainApp.get('/hls/:udid/segment-:index.ts', (req, res) => {
             const udid = req.params.udid;
             const index = req.params.index;
             const segmentName = `segment-${index}.ts`;
-            
+
             console.log(`[HttpServer] Requesting HLS segment: ${segmentName} for: ${udid}`);
-            
+
             const tsData = HlsStreamService.getInstance().getSegment(udid, segmentName);
             if (tsData) {
                 res.setHeader('Content-Type', 'video/MP2T');
@@ -114,7 +114,7 @@ export class HttpServer extends TypedEmitter<HttpServerEvents> implements Servic
         this.mainApp.get('/api/device-by-uuid/:uuid', (req, res) => {
             const uuid = req.params.uuid;
             console.log(`[HttpServer] Requesting device info for UUID: ${uuid}`);
-            
+
             const link = ScreenWallService.getInstance().getLinkByUuid(uuid);
             if (link) {
                 res.setHeader('Content-Type', 'application/json');
@@ -135,7 +135,7 @@ export class HttpServer extends TypedEmitter<HttpServerEvents> implements Servic
                 });
             }
         });
-        
+
         if (HttpServer.SERVE_STATIC && HttpServer.PUBLIC_DIR) {
             this.mainApp.use(PATHNAME, express.static(HttpServer.PUBLIC_DIR));
 

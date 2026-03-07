@@ -106,9 +106,9 @@ export abstract class BasePlayer extends TypedEmitter<PlayerEvents> {
 
     constructor(
         public readonly udid: string,
-        protected displayInfo?: DisplayInfo,
+        protected _displayInfo?: DisplayInfo,
         protected name: string = 'BasePlayer',
-        protected storageKeyPrefix: string = 'Dummy',
+        protected _storageKeyPrefix: string = 'Dummy',
         protected tag: HTMLElement = document.createElement('div'),
     ) {
         super();
@@ -118,7 +118,15 @@ export abstract class BasePlayer extends TypedEmitter<PlayerEvents> {
             event.preventDefault();
         };
         const preferred = this.getPreferredVideoSetting();
-        this.videoSettings = BasePlayer.getVideoSettingFromStorage(preferred, this.storageKeyPrefix, udid, displayInfo);
+        this.videoSettings = BasePlayer.getVideoSettingFromStorage(preferred, this._storageKeyPrefix, udid, _displayInfo);
+    }
+
+    public get displayInfo(): DisplayInfo | undefined {
+        return this._displayInfo;
+    }
+
+    public get storageKeyPrefix(): string {
+        return this._storageKeyPrefix;
     }
 
     protected calculateScreenInfoForBounds(videoWidth: number, videoHeight: number): void {
@@ -171,13 +179,11 @@ export abstract class BasePlayer extends TypedEmitter<PlayerEvents> {
     }
 
     private static getStorageKey(storageKeyPrefix: string, udid: string): string {
-        const { innerHeight, innerWidth } = window;
-        return `${storageKeyPrefix}:${udid}:${innerWidth}x${innerHeight}`;
+        return `${storageKeyPrefix}:${udid}`;
     }
 
-    private static getFullStorageKey(storageKeyPrefix: string, udid: string, displayInfo?: DisplayInfo): string {
-        const { innerHeight, innerWidth } = window;
-        let base = `${storageKeyPrefix}:${udid}:${innerWidth}x${innerHeight}`;
+    public static getFullStorageKey(storageKeyPrefix: string, udid: string, displayInfo?: DisplayInfo): string {
+        let base = `${storageKeyPrefix}:${udid}`;
         if (displayInfo) {
             const { displayId, size } = displayInfo;
             base = `${base}:${displayId}:${size.width}x${size.height}`;
@@ -280,7 +286,7 @@ export abstract class BasePlayer extends TypedEmitter<PlayerEvents> {
         });
     }
 
-    protected static putVideoSettingsToStorage(
+    public static putVideoSettingsToStorage(
         storageKeyPrefix: string,
         udid: string,
         videoSettings: VideoSettings,
@@ -290,10 +296,20 @@ export abstract class BasePlayer extends TypedEmitter<PlayerEvents> {
         if (!window.localStorage) {
             return;
         }
-        const key = this.getFullStorageKey(storageKeyPrefix, udid, displayInfo);
-        window.localStorage.setItem(key, JSON.stringify(videoSettings));
-        const fitKey = `${key}:fit`;
-        window.localStorage.setItem(fitKey, JSON.stringify(fitToScreen));
+        
+        const shortKey = this.getStorageKey(storageKeyPrefix, udid);
+        console.log('[BasePlayer] Saving video settings to short key:', shortKey, videoSettings);
+        window.localStorage.setItem(shortKey, JSON.stringify(videoSettings));
+        const shortFitKey = `${shortKey}:fit`;
+        window.localStorage.setItem(shortFitKey, JSON.stringify(fitToScreen));
+        
+        if (displayInfo) {
+            const fullKey = this.getFullStorageKey(storageKeyPrefix, udid, displayInfo);
+            console.log('[BasePlayer] Saving video settings to full key:', fullKey, videoSettings);
+            window.localStorage.setItem(fullKey, JSON.stringify(videoSettings));
+            const fullFitKey = `${fullKey}:fit`;
+            window.localStorage.setItem(fullFitKey, JSON.stringify(fitToScreen));
+        }
     }
 
     public abstract getImageDataURL(): string;
@@ -352,17 +368,17 @@ export abstract class BasePlayer extends TypedEmitter<PlayerEvents> {
         this.parentElement = parent;
         parent.appendChild(this.tag);
         parent.appendChild(this.touchableCanvas);
-        
+
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
         }
-        
+
         this.resizeObserver = new ResizeObserver(() => {
             this.applyScaling();
         });
-        
+
         this.resizeObserver.observe(parent);
-        
+
         requestAnimationFrame(() => {
             this.applyScaling();
         });
@@ -579,11 +595,11 @@ export abstract class BasePlayer extends TypedEmitter<PlayerEvents> {
     }
 
     public getDisplayInfo(): DisplayInfo | undefined {
-        return this.displayInfo;
+        return this._displayInfo;
     }
 
     public setDisplayInfo(displayInfo: DisplayInfo): void {
-        this.displayInfo = displayInfo;
+        this._displayInfo = displayInfo;
     }
 
     public abstract getFitToScreenStatus(): boolean;

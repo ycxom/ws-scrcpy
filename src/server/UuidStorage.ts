@@ -105,22 +105,22 @@ export class UuidStorage {
         const now = Date.now();
         const expiry = EXPIRY_DAYS * 24 * 60 * 60 * 1000;
         const uuidsToRemove: string[] = [];
-        
+
         for (const [uuid, stored] of Object.entries(this.data)) {
             if (now > stored.timestamp + expiry) {
                 uuidsToRemove.push(uuid);
             }
         }
-        
+
         uuidsToRemove.forEach((uuid) => {
             delete this.data[uuid];
         });
-        
+
         if (uuidsToRemove.length > 0) {
             this.save();
             console.log(`[UuidStorage] Cleared ${uuidsToRemove.length} expired UUID mappings`);
         }
-        
+
         return uuidsToRemove.length;
     }
 

@@ -12,10 +12,10 @@ export class WebsocketProxy extends Mw {
     private released = false;
     private storage: WS.MessageEvent[] = [];
     private udid?: string;
-    private hlsStreamActive: boolean = false;
+    private hlsStreamActive = false;
     private tsMuxer?: SimpleTsMuxer;
     private frameBuffer: Buffer[] = [];
-    private frameCount: number = 0;
+    private frameCount = 0;
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public static processRequest(ws: WS, params: RequestParameters): WebsocketProxy | undefined {
@@ -49,12 +49,12 @@ export class WebsocketProxy extends Mw {
     constructor(ws: WS | Multiplexer) {
         super(ws);
     }
-    
+
     public setUdid(udid: string): void {
         this.udid = udid;
         console.log(`[${WebsocketProxy.TAG}] Set udid: ${udid}`);
     }
-    
+
     private initHlsStream(): void {
         if (!this.udid) {
             return;
@@ -68,7 +68,7 @@ export class WebsocketProxy extends Mw {
             console.error(`[${WebsocketProxy.TAG}] Failed to start HLS stream:`, e);
         }
     }
-    
+
     private addHlsFrame(data: Buffer): void {
         if (!this.hlsStreamActive || !this.udid || !this.tsMuxer) {
             return;
@@ -77,7 +77,7 @@ export class WebsocketProxy extends Mw {
             // 简单的缓冲区策略：每 15 帧创建一个 TS 片段
             this.frameBuffer.push(data);
             this.frameCount++;
-            
+
             if (this.frameCount >= 15) {
                 const combinedData = Buffer.concat(this.frameBuffer);
                 const tsData = this.tsMuxer.addH264Frame(combinedData);
@@ -153,7 +153,7 @@ export class WebsocketProxy extends Mw {
 
     private sendToHls(data: any): void {
         if (!this.udid) return;
-        
+
         // 确保数据是 Buffer 或 Uint8Array
         let buffer: Buffer;
         if (data instanceof Buffer) {
@@ -165,12 +165,12 @@ export class WebsocketProxy extends Mw {
         } else {
             return; // 不是视频数据，跳过
         }
-        
+
         // 如果 HLS 流未激活但有屏幕墙客户端，初始化
         if (!this.hlsStreamActive && ScreenWallService.getInstance().getClientCount() > 0) {
             this.initHlsStream();
         }
-        
+
         // 如果 HLS 流激活了，添加帧
         if (this.hlsStreamActive) {
             this.addHlsFrame(buffer);

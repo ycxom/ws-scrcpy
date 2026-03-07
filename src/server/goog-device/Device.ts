@@ -438,21 +438,21 @@ export class Device extends TypedEmitter<DeviceEvents> {
             if (serial && serial !== 'unknown' && serial !== 'null') {
                 return serial;
             }
-            
+
             // 2. 尝试 ro.boot.serialno
             output = await this.runShellCommandAdbKit('getprop ro.boot.serialno');
             serial = output.trim();
             if (serial && serial !== 'unknown' && serial !== 'null') {
                 return serial;
             }
-            
+
             // 3. 尝试从 /proc/cpuinfo 获取硬件序列号
-            output = await this.runShellCommandAdbKit('cat /proc/cpuinfo | grep Serial | awk \'{print $3}\'');
+            output = await this.runShellCommandAdbKit("cat /proc/cpuinfo | grep Serial | awk '{print $3}'");
             serial = output.trim();
             if (serial && serial.length > 5) {
                 return serial;
             }
-            
+
             return undefined;
         } catch (e) {
             return undefined;

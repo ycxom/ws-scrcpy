@@ -28,7 +28,7 @@ export class HlsStreamService implements Service {
         }
         return this.instance;
     }
-    
+
     public static hasInstance(): boolean {
         return !!this.instance;
     }
@@ -87,7 +87,7 @@ export class HlsStreamService implements Service {
 #EXT-X-TARGETDURATION:2
 #EXT-X-MEDIA-SEQUENCE:0
 `;
-        stream.segments.forEach(segment => {
+        stream.segments.forEach((segment) => {
             m3u8 += `#EXTINF:2.0,
 ${segment}
 `;
@@ -150,7 +150,7 @@ ${segment}
         }
         console.log('[HlsStreamService] Stopped');
     }
-    
+
     public release(): void {
         this.stop();
     }

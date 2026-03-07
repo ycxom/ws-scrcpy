@@ -99,18 +99,22 @@ export class ScreenWallService {
         const mac = device.macAddress;
         const model = device['ro.product.model'] || '';
         const isWired = this.isWiredConnection(udid);
-        
+
         // 使用 MAC + 型号生成唯一ID（MAC是同一设备的最可靠标识）
         const uniqueId = this.generateUniqueDeviceId(mac, model);
-        
-        console.log(`[ScreenWallMw] Processing device: ${udid}, model=${model}, mac=${mac || 'N/A'}, uniqueId=${uniqueId}`);
+
+        console.log(
+            `[ScreenWallMw] Processing device: ${udid}, model=${model}, mac=${mac || 'N/A'}, uniqueId=${uniqueId}`,
+        );
         console.log(`[ScreenWallMw] Current deviceUniqueIdMap size: ${this.deviceUniqueIdMap.size}`);
-        
+
         if (device.state === 'device') {
             const existingInfo = this.deviceUniqueIdMap.get(uniqueId);
-            
+
             if (existingInfo) {
-                console.log(`[ScreenWallMw] Found existing device: ${existingInfo.udid}, isWired=${existingInfo.isWired}`);
+                console.log(
+                    `[ScreenWallMw] Found existing device: ${existingInfo.udid}, isWired=${existingInfo.isWired}`,
+                );
                 if (isWired) {
                     console.log(`[ScreenWallMw] Wired device found for ${uniqueId}: ${udid}, replacing wireless`);
                     this.removeLink(existingInfo.linkId);
@@ -126,8 +130,8 @@ export class ScreenWallService {
             } else {
                 console.log(`[ScreenWallMw] No existing device found for uniqueId: ${uniqueId}`);
             }
-            
-            let deviceName = device['ro.product.model'] || device.udid;
+
+            const deviceName = device['ro.product.model'] || device.udid;
             let deviceUrl = '';
 
             if (device.pid !== -1) {
@@ -137,7 +141,7 @@ export class ScreenWallService {
                 proxyUrl.searchParams.set('action', 'proxy-adb');
                 proxyUrl.searchParams.set('remote', 'tcp:8886');
                 proxyUrl.searchParams.set('udid', udid);
-                
+
                 deviceUrl = proxyUrl.toString();
             }
 
@@ -159,10 +163,12 @@ export class ScreenWallService {
                 isWired,
                 linkId,
             });
-            
+
             this.autoAddedDevices.add(udid);
             this.addLink(link);
-            console.log(`[ScreenWallMw] Auto-added device: ${deviceName} (${udid}, wired=${isWired}, mac=${mac || 'N/A'})`);
+            console.log(
+                `[ScreenWallMw] Auto-added device: ${deviceName} (${udid}, wired=${isWired}, mac=${mac || 'N/A'})`,
+            );
         } else {
             const existingInfo = this.deviceUniqueIdMap.get(uniqueId);
             if (existingInfo && this.autoAddedDevices.has(udid)) {
@@ -265,7 +271,7 @@ export class ScreenWallService {
             type: 'list',
             data: undefined,
         };
-        const linksWithUuid = this.getLinks().map(link => ({
+        const linksWithUuid = this.getLinks().map((link) => ({
             ...link,
             uuid: this.getOrCreateUuid(link.id),
         }));
@@ -306,8 +312,8 @@ export class ScreenWallService {
 
     private generateUuid(): string {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            const r = (Math.random() * 16) | 0;
+            const v = c === 'x' ? r : (r & 0x3) | 0x8;
             return v.toString(16);
         });
     }
@@ -341,7 +347,7 @@ export class ScreenWallService {
             }
             return link;
         }
-        
+
         const storedLinkId = this.uuidStorage.get(uuid);
         if (storedLinkId) {
             const link = this.links.get(storedLinkId);
@@ -372,10 +378,7 @@ export class ScreenWallProxy extends Mw {
     private storage: Buffer[] = [];
     private link: ScreenWallLink;
 
-    constructor(
-        _link: ScreenWallLink,
-        ws: WS | Multiplexer,
-    ) {
+    constructor(_link: ScreenWallLink, ws: WS | Multiplexer) {
         super(ws);
         this.link = _link;
         this.init(_link.url);
@@ -386,7 +389,7 @@ export class ScreenWallProxy extends Mw {
 
         try {
             let wsUrl = remoteUrl;
-            
+
             const url = new URL(remoteUrl);
             const action = url.searchParams.get('action');
 

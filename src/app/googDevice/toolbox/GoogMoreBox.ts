@@ -13,7 +13,9 @@ const TAG = '[GoogMoreBox]';
 export class GoogMoreBox {
     private static defaultSize = new Size(1920, 1920);
     private onStop?: () => void;
+    private onHide?: () => void;
     private readonly holder: HTMLElement;
+    private readonly overlay: HTMLElement;
     private readonly input: HTMLTextAreaElement;
     private readonly bitrateInput?: HTMLInputElement;
     private readonly bitrateUnitSelect?: HTMLSelectElement;
@@ -41,6 +43,18 @@ export class GoogMoreBox {
         const videoSettings = player.getVideoSettings();
         const { displayId } = videoSettings;
         const preferredSettings = player.getPreferredVideoSetting();
+
+        // 创建遮罩层
+        this.overlay = document.createElement('div');
+        this.overlay.className = 'more-box-overlay';
+        document.body.appendChild(this.overlay);
+
+        // 点击遮罩层关闭侧边栏
+        this.overlay.addEventListener('click', () => {
+            this.hide();
+        });
+
+        // 创建侧边栏
         const moreBox = document.createElement('div');
         moreBox.className = 'more-box';
         const nameBox = document.createElement('p');
@@ -91,9 +105,12 @@ export class GoogMoreBox {
                 bitrateInput = document.createElement('input');
                 const DEFAULT_UNIT = 1000000;
                 const bitrateInMbps = GoogMoreBox.convertBitrateToDisplay(videoSettings.bitrate, DEFAULT_UNIT);
-                bitrateInput.placeholder = `${GoogMoreBox.convertBitrateToDisplay(preferredSettings.bitrate, DEFAULT_UNIT)}`;
+                bitrateInput.placeholder = `${GoogMoreBox.convertBitrateToDisplay(
+                    preferredSettings.bitrate,
+                    DEFAULT_UNIT,
+                )}`;
                 bitrateInput.value = bitrateInMbps.toString();
-                
+
                 const bitrateUnitSelect = document.createElement('select');
                 GoogMoreBox.BITRATE_UNITS.forEach((unit) => {
                     const option = document.createElement('option');
@@ -104,7 +121,7 @@ export class GoogMoreBox {
                     }
                     bitrateUnitSelect.appendChild(option);
                 });
-                
+
                 const bitrateWrapper = document.createElement('div');
                 bitrateWrapper.style.display = 'flex';
                 bitrateWrapper.style.gap = '5px';
@@ -175,7 +192,9 @@ export class GoogMoreBox {
                 btn.onclick = () => {
                     const bitrateValue = parseInt(bitrateInput.value, 10);
                     const unitValue = parseInt(this.bitrateUnitSelect!.value, 10);
-                    const bitrate = isNaN(bitrateValue) ? 0 : GoogMoreBox.convertBitrateFromDisplay(bitrateValue, unitValue);
+                    const bitrate = isNaN(bitrateValue)
+                        ? 0
+                        : GoogMoreBox.convertBitrateFromDisplay(bitrateValue, unitValue);
                     const maxFps = parseInt(maxFpsInput.value, 10);
                     const iFrameInterval = parseInt(iFrameIntervalInput.value, 10);
                     if (isNaN(bitrate) || isNaN(maxFps)) {
@@ -199,6 +218,25 @@ export class GoogMoreBox {
                         encoderName,
                     });
                     client.sendNewVideoSetting(videoSettings);
+                    
+                    let fitToScreen = false;
+                    const maxSize = client.getMaxSize();
+                    if (maxSize && bounds && bounds.equals(maxSize)) {
+                        fitToScreen = true;
+                    }
+                    
+                    console.log('[GoogMoreBox] Saving user changed video settings:', { bitrate, maxFps, iFrameInterval, bounds, fitToScreen });
+                    
+                    const playerClass = Object.getPrototypeOf(player).constructor;
+                    playerClass.putVideoSettingsToStorage(
+                        player.storageKeyPrefix,
+                        player.udid,
+                        videoSettings,
+                        fitToScreen,
+                        player.displayInfo,
+                    );
+                    
+                    player.setVideoSettings(videoSettings, fitToScreen, false);
                 };
             } else if (action === CommandControlMessage.TYPE_SET_CLIPBOARD) {
                 btn.onclick = () => {
@@ -253,7 +291,10 @@ export class GoogMoreBox {
             if (parent) {
                 parent.removeChild(moreBox);
             }
-            player.off('video-view-resize', this.onViewVideoResize);
+            const overlayParent = this.overlay.parentElement;
+            if (overlayParent) {
+                overlayParent.removeChild(this.overlay);
+            }
             if (this.onStop) {
                 this.onStop();
                 delete this.onStop;
@@ -265,15 +306,34 @@ export class GoogMoreBox {
         stopBtn.onclick = stop;
 
         GoogMoreBox.wrap('p', [stopBtn], moreBox);
-        player.on('video-view-resize', this.onViewVideoResize);
         player.on('video-settings', this.onVideoSettings);
         this.holder = moreBox;
     }
 
-    private onViewVideoResize = (size: Size): void => {
-        // padding: 10px
-        this.holder.style.width = `${size.width - 2 * 10}px`;
-    };
+    public show(): void {
+        this.overlay.classList.add('show');
+        this.holder.classList.add('show');
+    }
+
+    public hide(): void {
+        this.overlay.classList.remove('show');
+        this.holder.classList.remove('show');
+        if (this.onHide) {
+            this.onHide();
+        }
+    }
+
+    public toggle(): void {
+        if (this.holder.classList.contains('show')) {
+            this.hide();
+        } else {
+            this.show();
+        }
+    }
+
+    public setOnHide(callback: () => void): void {
+        this.onHide = callback;
+    }
 
     private onVideoSettings = (videoSettings: VideoSettings): void => {
         if (this.bitrateInput && this.bitrateUnitSelect) {
