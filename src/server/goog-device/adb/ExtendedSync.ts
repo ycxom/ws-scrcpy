@@ -67,7 +67,8 @@ export class ExtendedSync {
                     stream.send(Buffer.concat([Buffer.from(reply), data]));
                     return readNext();
                 case Protocol.DONE:
-                    await this.parser.readBytes(4);
+                    const doneData = await this.parser.readBytes(4);
+                    stream.send(Buffer.concat([Buffer.from(reply), doneData]));
                     stream.close(1000);
                     return;
                 case Protocol.FAIL:

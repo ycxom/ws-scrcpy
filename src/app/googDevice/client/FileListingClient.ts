@@ -26,6 +26,15 @@ const rootPath = '/';
 const tempPath = '/data/local/tmp';
 const storagePath = '/storage';
 
+function formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const size = parseFloat((bytes / Math.pow(k, i)).toFixed(1));
+    return `${size} ${sizes[i]}`;
+}
+
 type Download = {
     receivedBytes: number;
     entry?: Entry;
@@ -90,6 +99,7 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
     private readonly parent: HTMLElement;
     private enterCount = 0;
     private entries: Entry[] = [];
+    private originalEntries: Entry[] = [];
     private path: string;
     private requireClean = false;
     private requestedPath = '';
@@ -97,6 +107,8 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
     private uploads: Map<string, Upload> = new Map();
     private tableBody: HTMLElement;
     private channels: Set<Multiplexer> = new Set();
+    private sortColumn: 'name' | 'size' | 'mtime' = 'name';
+    private sortDirection: 'asc' | 'desc' = 'asc';
     constructor(params: ParamsFileListing) {
         super(params);
         this.parent = document.body;
@@ -109,25 +121,30 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
         this.tableBodyId = `${Util.escapeUdid(this.serial)}_list`;
         this.wrapperId = `wrapper_${this.tableBodyId}`;
         const fragment = html`<div id="${this.wrapperId}" class="listing">
-            <h1 id="header">Contents ${this.path}</h1>
-            <div id="${parentDirLinkBox}" class="quick-link-box">
-                <a class="icon up" href="#!" ${FileListingClient.PROPERTY_NAME}=".."> [parent] </a>
+            <div id="header" class="path-bar">
+                <span class="path-label">目录:</span>
+                <input type="text" id="path-input" class="path-input" value="${this.path}" placeholder="输入路径...">
             </div>
-            <div id="${rootDirLinkBox}" class="quick-link-box">
-                <a class="icon dir" href="#!" ${FileListingClient.PROPERTY_NAME}="${rootPath}"> [root] </a>
-            </div>
-            <div id="${storageDirLinkBox}" class="quick-link-box">
-                <a class="icon dir" href="#!" ${FileListingClient.PROPERTY_NAME}="${storagePath}/"> [storage] </a>
-            </div>
-            <div id="${tempDirLinkBox}" class="quick-link-box">
-                <a class="icon dir" href="#!" ${FileListingClient.PROPERTY_NAME}="${tempPath}/"> [temp] </a>
+            <div class="quick-links-container">
+                <div id="${parentDirLinkBox}" class="quick-link-box">
+                    <a class="icon up" href="#!" ${FileListingClient.PROPERTY_NAME}=".."> 返回上级 </a>
+                </div>
+                <div id="${rootDirLinkBox}" class="quick-link-box">
+                    <a class="icon dir" href="#!" ${FileListingClient.PROPERTY_NAME}="${rootPath}"> 根目录 </a>
+                </div>
+                <div id="${storageDirLinkBox}" class="quick-link-box">
+                    <a class="icon dir" href="#!" ${FileListingClient.PROPERTY_NAME}="${storagePath}/"> 存储目录 </a>
+                </div>
+                <div id="${tempDirLinkBox}" class="quick-link-box">
+                    <a class="icon dir" href="#!" ${FileListingClient.PROPERTY_NAME}="${tempPath}/"> 临时目录 </a>
+                </div>
             </div>
             <table>
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Size</th>
-                        <th>MTime</th>
+                    <th data-sort="name">名称</th>
+                    <th data-sort="size">大小</th>
+                    <th data-sort="mtime">修改时间</th>
                     </tr>
                 </thead>
                 <tbody id="${this.tableBodyId}"></tbody>
@@ -140,7 +157,37 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
                 if (!e.target || !(e.target instanceof HTMLElement)) {
                     return;
                 }
-                const name = e.target.getAttribute(FileListingClient.PROPERTY_NAME);
+                const sortColumn = e.target.getAttribute('data-sort');
+                if (sortColumn) {
+                    e.preventDefault();
+                    e.cancelBubble = true;
+                    this.handleSort(sortColumn as 'name' | 'size' | 'mtime');
+                    return;
+                }
+                
+                let target = e.target;
+                let name = target.getAttribute(FileListingClient.PROPERTY_NAME);
+                let entryIdString = target.getAttribute(FileListingClient.PROPERTY_ENTRY_ID);
+                
+                if (!name) {
+                    const link = target.closest('a');
+                    if (link) {
+                        name = link.getAttribute(FileListingClient.PROPERTY_NAME);
+                        entryIdString = link.getAttribute(FileListingClient.PROPERTY_ENTRY_ID);
+                    }
+                }
+                
+                if (!name) {
+                    const row = target.closest('tr.entry-row');
+                    if (row) {
+                        const link = row.querySelector('a');
+                        if (link) {
+                            name = link.getAttribute(FileListingClient.PROPERTY_NAME);
+                            entryIdString = link.getAttribute(FileListingClient.PROPERTY_ENTRY_ID);
+                        }
+                    }
+                }
+                
                 if (!name) {
                     return;
                 }
@@ -148,14 +195,18 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
                 e.cancelBubble = true;
                 const newPath = path.resolve(this.path, name);
                 if (newPath !== this.path) {
-                    const entryIdString = e.target.getAttribute(FileListingClient.PROPERTY_ENTRY_ID);
                     let entry: Entry | undefined;
                     let anchor: HTMLElement | undefined;
                     if (entryIdString) {
                         const entryId = parseInt(entryIdString, 10);
                         if (!isNaN(entryId) && this.entries[entryId]) {
                             entry = this.entries[entryId];
-                            anchor = e.target;
+                        }
+                    }
+                    if (entry) {
+                        const row = document.getElementById(`entry-${name}`);
+                        if (row) {
+                            anchor = row.querySelector('a') as HTMLElement;
                         }
                     }
                     this.loadContent(newPath, entry, anchor);
@@ -166,8 +217,32 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
                 this.filePushHandler = new FilePushHandler(this.parent, new AdbkitFilePushStream(this.ws, this));
                 this.filePushHandler.addEventListener(this);
             }
+            
+            const pathInput = fragment.getElementById('path-input') as HTMLInputElement;
+            if (pathInput) {
+                pathInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const newPath = pathInput.value.trim();
+                        if (newPath && newPath !== this.path) {
+                            this.loadContent(newPath);
+                        }
+                    }
+                });
+                
+                pathInput.addEventListener('focus', () => {
+                    pathInput.select();
+                });
+            }
         }
         this.parent.appendChild(fragment);
+    }
+    
+    private updatePathInput(path: string): void {
+        const pathInput = document.getElementById('path-input') as HTMLInputElement;
+        if (pathInput) {
+            pathInput.value = path;
+        }
     }
 
     public onDragEnter(): boolean {
@@ -343,10 +418,7 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
 
     protected clean(): void {
         this.tableBody.innerHTML = '';
-        const header = document.getElementById('header');
-        if (header) {
-            header.innerText = `Content ${this.path}`;
-        }
+        this.updatePathInput(this.path);
         this.toggleQuickLinks(this.path);
 
         // FIXME: should do over way around: load content on hash change
@@ -383,6 +455,10 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
     protected handleReply(channel: Multiplexer, e: MessageEvent): void {
         const data = Buffer.from(e.data);
         const reply = data.slice(0, 4).toString('ascii');
+        console.log('[FileListing] Received message:', {
+            reply,
+            dataLength: data.length
+        });
         switch (reply) {
             case Protocol.DENT:
                 const stat = data.slice(4);
@@ -471,8 +547,10 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
             this.clean();
             this.requireClean = false;
             this.entries.length = 0;
+            this.originalEntries.length = 0;
         }
         this.entries.push(entry);
+        this.originalEntries.push(entry);
         const entryId = (this.entries.length - 1).toString();
         if (entry.name === '.') {
             return;
@@ -489,7 +567,76 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
         }
         const type = entry.isDirectory() ? 'dir' : entry.isSymbolicLink() ? 'link' : entry.isFile() ? 'file' : 'else';
         const date = entry.mtime.toLocaleString();
-        return this.addRow(false, entry.name, type, entry.size.toString(), date, entryId);
+        const sizeText = entry.isDirectory() ? '' : formatBytes(entry.size);
+        return this.addRow(false, entry.name, type, sizeText, date, entryId);
+    }
+    
+    private handleSort(column: 'name' | 'size' | 'mtime'): void {
+        if (this.sortColumn === column) {
+            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.sortColumn = column;
+            this.sortDirection = 'asc';
+        }
+        
+        this.sortAndRender();
+    }
+    
+    private sortAndRender(): void {
+        const sorted = [...this.originalEntries].sort((a, b) => {
+            let comparison = 0;
+            
+            if (a.isDirectory() !== b.isDirectory()) {
+                comparison = a.isDirectory() ? -1 : 1;
+            } else {
+                switch (this.sortColumn) {
+                    case 'name':
+                        comparison = a.name.localeCompare(b.name);
+                        break;
+                    case 'size':
+                        comparison = a.size - b.size;
+                        break;
+                    case 'mtime':
+                        comparison = a.mtime.getTime() - b.mtime.getTime();
+                        break;
+                }
+            }
+            
+            return this.sortDirection === 'asc' ? comparison : -comparison;
+        });
+        
+        this.entries = sorted;
+        this.clean();
+        this.renderSortedEntries();
+        this.updateSortIndicators();
+    }
+    
+    private renderSortedEntries(): void {
+        for (let i = 0; i < this.entries.length; i++) {
+            const entry = this.entries[i];
+            if (entry.name === '.' || entry.name === FileListingClient.PARENT_DIR) {
+                continue;
+            }
+            const type = entry.isDirectory() ? 'dir' : entry.isSymbolicLink() ? 'link' : entry.isFile() ? 'file' : 'else';
+            const date = entry.mtime.toLocaleString();
+            const sizeText = entry.isDirectory() ? '' : formatBytes(entry.size);
+            this.addRow(false, entry.name, type, sizeText, date, i.toString());
+        }
+    }
+    
+    private updateSortIndicators(): void {
+        const headers = document.querySelectorAll('th[data-sort]');
+        headers.forEach(th => {
+            const sortColumn = th.getAttribute('data-sort');
+            if (sortColumn === this.sortColumn) {
+                const arrow = this.sortDirection === 'asc' ? ' ↑' : ' ↓';
+                let text = th.textContent?.replace(/ [↑↓]$/, '') || '';
+                th.textContent = text + arrow;
+            } else {
+                let text = th.textContent?.replace(/ [↑↓]$/, '') || '';
+                th.textContent = text;
+            }
+        });
     }
 
     protected addRow(push: boolean, name: string, typeClass: string, size = '', date = '', entryId = ''): HTMLElement {
@@ -536,6 +683,7 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
     protected finishDownload(channel: Multiplexer): void {
         const download = this.downloads.get(channel);
         if (!download) {
+            console.error('[FileListing] No download found for channel');
             return;
         }
         this.downloads.delete(channel);
@@ -550,15 +698,44 @@ export class FileListingClient extends ManagerClient<ParamsFileListing, never> i
             // we always should have `download.entry` and never be here
             name = path.basename(this.path);
         }
+        
+        console.log('[FileListing] Download finished:', {
+            name,
+            chunksCount: download.chunks.length,
+            receivedBytes: download.receivedBytes
+        });
+        
         if (download.pathToLoadAfter) {
             this.channels.delete(channel);
             this.loadContent(download.pathToLoadAfter);
         }
-        const file = new File(download.chunks, name, { type: 'application/octet-stream' });
+        
+        if (download.chunks.length === 0) {
+            console.error('[FileListing] No data received!');
+            alert('下载失败：没有接收到数据');
+            return;
+        }
+        
+        const blob = new Blob(download.chunks as BlobPart[], { type: 'application/octet-stream' });
+        console.log('[FileListing] Blob created, size:', blob.size);
+        
+        const url = URL.createObjectURL(blob);
+        console.log('[FileListing] Object URL created:', url);
+        
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(file);
-        a.download = `${name}`;
+        a.href = url;
+        a.download = name;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        console.log('[FileListing] Triggering download...');
         a.click();
+        console.log('[FileListing] Download triggered');
+        
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            console.log('[FileListing] Cleanup complete');
+        }, 100);
     }
 
     protected cleanProgress(el: HTMLElement): void {

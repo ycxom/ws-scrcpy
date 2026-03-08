@@ -149,10 +149,12 @@ export class ScreenWall extends ScreenWallBase {
         const bitrateKbps = Math.round((link.bitrate || 200000) / 1000);
         const fps = link.maxFps || 10;
         const streamUrl = this.buildStreamUrl(link);
+        const udid = link.udid || link.id;
+        const uuid = link.uuid || udid;
 
         return `
             <div class="screen-wall-card" data-link-id="${link.id}" data-udid="${encodeURIComponent(
-            link.udid || link.id,
+            udid,
         )}" data-ws="${encodeURIComponent(link.url || '')}">
                 <div class="screen-wall-card-preview">
                     <iframe src="${streamUrl}" class="card-iframe" frameborder="0" scrolling="no"></iframe>
@@ -166,6 +168,14 @@ export class ScreenWall extends ScreenWallBase {
                         </span>
                     </div>
                 </div>
+                <div class="screen-wall-card-buttons">
+                    <button class="screen-wall-card-btn btn-shell" data-uuid="${encodeURIComponent(
+                        uuid,
+                    )}">进入设备 shell</button>
+                    <button class="screen-wall-card-btn btn-file" data-uuid="${encodeURIComponent(
+                        uuid,
+                    )}">文件下载</button>
+                </div>
             </div>
         `;
     }
@@ -175,14 +185,46 @@ export class ScreenWall extends ScreenWallBase {
         if (!grid) return;
 
         grid.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            
+            const shellBtn = target.closest('.btn-shell');
+            if (shellBtn) {
+                const uuid = decodeURIComponent(shellBtn.getAttribute('data-uuid') || '');
+                console.log('[ScreenWall] Navigating to shell, uuid:', uuid);
+                this.navigateToShell(uuid);
+                return;
+            }
+            
+            const fileBtn = target.closest('.btn-file');
+            if (fileBtn) {
+                const uuid = decodeURIComponent(fileBtn.getAttribute('data-uuid') || '');
+                console.log('[ScreenWall] Navigating to file listing, uuid:', uuid);
+                this.navigateToFileListing(uuid);
+                return;
+            }
+
             console.log('[ScreenWall] Click event triggered');
-            const card = (e.target as HTMLElement).closest('.screen-wall-card');
+            const card = target.closest('.screen-wall-card');
             if (card) {
                 const linkId = card.getAttribute('data-link-id');
                 console.log('[ScreenWall] Navigating to control, linkId:', linkId);
                 this.navigateToControl(linkId || '');
             }
         });
+    }
+    
+    private navigateToShell(uuid: string): void {
+        const hash = `#!action=shell&uuid=${encodeURIComponent(uuid)}`;
+        console.log('[ScreenWall] Setting hash for shell:', hash);
+        window.location.hash = hash;
+        window.location.reload();
+    }
+    
+    private navigateToFileListing(uuid: string): void {
+        const hash = `#!action=list-files&uuid=${encodeURIComponent(uuid)}&path=/storage`;
+        console.log('[ScreenWall] Setting hash for file listing:', hash);
+        window.location.hash = hash;
+        window.location.reload();
     }
 
     private buildStreamUrl(link: ScreenWallLink): string {

@@ -1,5 +1,6 @@
 import { Mw } from '../../mw/Mw';
 import { AdbUtils } from '../AdbUtils';
+import { AdbExtended } from '../adb';
 import Util from '../../../app/Util';
 import Protocol from '@dead50f7/adbkit/lib/adb/protocol';
 import { Multiplexer } from '../../../packages/multiplexer/Multiplexer';
@@ -78,7 +79,8 @@ export class FileListing extends Mw {
                 return AdbUtils.pipeReadDirToStream(serial, pathString, channel);
             }
             if (cmd === Protocol.RECV) {
-                return AdbUtils.pipePullFileToStream(serial, pathString, channel);
+                const client = AdbExtended.createClient();
+                return client.pipePull(serial, pathString, channel);
             }
         } catch (error: any) {
             FileListing.sendError(error?.message, channel);

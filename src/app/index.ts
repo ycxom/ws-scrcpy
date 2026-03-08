@@ -114,9 +114,38 @@ window.onload = async function (): Promise<void> {
 
     /// #if INCLUDE_ADB_SHELL
     const { ShellClient } = await import('./googDevice/client/ShellClient');
-    if (action === ShellClient.ACTION && typeof parsedQuery.get('udid') === 'string') {
-        ShellClient.start(ShellClient.parseParameters(parsedQuery));
-        return;
+    if (action === ShellClient.ACTION) {
+        const uuid = parsedQuery.get('uuid');
+        const udid = parsedQuery.get('udid');
+
+        if (uuid) {
+            try {
+                const apiUrl = new URL(window.location.href);
+                apiUrl.pathname = `/api/device-by-uuid/${uuid}`;
+                const response = await fetch(apiUrl.toString());
+                const data = await response.json();
+
+                if (data.success && data.data) {
+                    const { udid: deviceUdid, url: deviceUrl } = data.data;
+                    parsedQuery.set('udid', deviceUdid);
+                    if (deviceUrl) {
+                        parsedQuery.set('ws', deviceUrl);
+                    }
+                    parsedQuery.delete('uuid');
+                    ShellClient.start(ShellClient.parseParameters(parsedQuery));
+                    return;
+                } else {
+                    console.error('Failed to get device info:', data.error);
+                    alert('无法通过UUID获取设备信息');
+                }
+            } catch (error) {
+                console.error('Error fetching device info:', error);
+                alert('获取设备信息失败');
+            }
+        } else if (udid) {
+            ShellClient.start(ShellClient.parseParameters(parsedQuery));
+            return;
+        }
     }
     tools.push(ShellClient);
     /// #endif
@@ -133,8 +162,37 @@ window.onload = async function (): Promise<void> {
     /// #if INCLUDE_FILE_LISTING
     const { FileListingClient } = await import('./googDevice/client/FileListingClient');
     if (action === FileListingClient.ACTION) {
-        FileListingClient.start(FileListingClient.parseParameters(parsedQuery));
-        return;
+        const uuid = parsedQuery.get('uuid');
+        const udid = parsedQuery.get('udid');
+
+        if (uuid) {
+            try {
+                const apiUrl = new URL(window.location.href);
+                apiUrl.pathname = `/api/device-by-uuid/${uuid}`;
+                const response = await fetch(apiUrl.toString());
+                const data = await response.json();
+
+                if (data.success && data.data) {
+                    const { udid: deviceUdid, url: deviceUrl } = data.data;
+                    parsedQuery.set('udid', deviceUdid);
+                    if (deviceUrl) {
+                        parsedQuery.set('ws', deviceUrl);
+                    }
+                    parsedQuery.delete('uuid');
+                    FileListingClient.start(FileListingClient.parseParameters(parsedQuery));
+                    return;
+                } else {
+                    console.error('Failed to get device info:', data.error);
+                    alert('无法通过UUID获取设备信息');
+                }
+            } catch (error) {
+                console.error('Error fetching device info:', error);
+                alert('获取设备信息失败');
+            }
+        } else if (udid) {
+            FileListingClient.start(FileListingClient.parseParameters(parsedQuery));
+            return;
+        }
     }
     tools.push(FileListingClient);
     /// #endif
